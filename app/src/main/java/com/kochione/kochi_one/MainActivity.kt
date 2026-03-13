@@ -10,7 +10,11 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,8 +32,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FloatingActionButton
@@ -56,8 +62,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.kochione.kochi_one.models.ExplorePost
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
@@ -76,6 +86,7 @@ import com.kochione.kochi_one.views.FoodView
 import com.kochione.kochi_one.views.PlayView
 import com.kochione.kochi_one.views.ProfileView
 import com.kochione.kochi_one.views.TransitView
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -274,6 +285,7 @@ fun MainScreen() {
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
     val configuration = LocalConfiguration.current
@@ -292,6 +304,7 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
     val sheetHeightPx = remember { Animatable(collapsedHeightPx) }
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableStateOf("Explore") }
+    var activeExplorePost by remember { mutableStateOf<ExplorePost?>(null) }
     
     val isDarkTheme = isSystemInDarkTheme()
     val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
@@ -373,56 +386,173 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
                 )
             }
             
-            // Search Bar & Profile Picture Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Search Bar
-                var searchQuery by remember { mutableStateOf("") }
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp),
-                    shape = RoundedCornerShape(25.dp),
-                    placeholder = { Text("Search Destination", style = MaterialTheme.typography.bodyMedium, color = textColor.copy(alpha=0.6f)) },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search Icon", tint = textColor) },
-                    textStyle = androidx.compose.ui.text.TextStyle(color = textColor),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = searchBarBgColor,
-                        unfocusedContainerColor = searchBarBgColor,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent
-                    ),
-                    singleLine = true
-                )
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
-                // Profile Image
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable { 
-                            selectedTab = "Profile"
-                            coroutineScope.launch {
-                                sheetHeightPx.animateTo(expandedHeightPx)
+            // Morphing Top Bar Row
+            SharedTransitionLayout {
+                AnimatedContent(
+                    targetState = activeExplorePost,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                            .togetherWith(fadeOut(animationSpec = tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing)))
+                    },
+                    label = "TopBarTransition"
+                ) { post ->
+                    if (post != null) {
+                        // Detail Top Bar: [Back] [Title Pill] [Logo]
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Back Button
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(searchBarBgColor)
+                                    .clickable { activeExplorePost = null },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back",
+                                    tint = textColor,
+                                    modifier = Modifier.size(24.dp)
+                                )
                             }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Person,
-                        contentDescription = "Profile",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(24.dp)
-                    )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Title Pill (Shared Element)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .sharedBounds(
+                                        rememberSharedContentState(key = "top_bar_search"),
+                                        animatedVisibilityScope = this@AnimatedContent,
+                                        boundsTransform = { _, _ -> tween(400) }
+                                    )
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(searchBarBgColor),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = post.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textColor,
+                                    maxLines = 1,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Account Logo
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (post.accountLogoUrl.isNotEmpty()) {
+                                    AsyncImage(
+                                        model = post.accountLogoUrl,
+                                        contentDescription = "Logo",
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Standard Search Bar Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Standard Search Bar Row (Shared Element Logic)
+                            var searchQuery by remember { mutableStateOf("") }
+                            val placeholders = listOf("Coffee nearby", "Best Dessert Spot?")
+                            var placeholderIndex by remember { mutableStateOf(0) }
+
+                            androidx.compose.runtime.LaunchedEffect(Unit) {
+                                while (true) {
+                                    delay(3000)
+                                    placeholderIndex = (placeholderIndex + 1) % placeholders.size
+                                }
+                            }
+
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(50.dp)
+                                    .sharedBounds(
+                                        rememberSharedContentState(key = "top_bar_search"),
+                                        animatedVisibilityScope = this@AnimatedContent,
+                                        boundsTransform = { _, _ -> tween(400) }
+                                    ),
+                                shape = RoundedCornerShape(25.dp),
+                                placeholder = {
+                                    AnimatedContent(
+                                        targetState = placeholders[placeholderIndex],
+                                        transitionSpec = {
+                                            (slideInVertically { height -> height } + fadeIn()) togetherWith
+                                                    (slideOutVertically { height -> -height } + fadeOut())
+                                        },
+                                        label = "PlaceholderAnimation"
+                                    ) { text ->
+                                        Text(
+                                            text = text,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = textColor.copy(alpha = 0.6f)
+                                        )
+                                    }
+                                },
+                                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search Icon", tint = textColor) },
+                                textStyle = androidx.compose.ui.text.TextStyle(color = textColor),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = searchBarBgColor,
+                                    unfocusedContainerColor = searchBarBgColor,
+                                    focusedBorderColor = Color.Transparent,
+                                    unfocusedBorderColor = Color.Transparent
+                                ),
+                                singleLine = true
+                            )
+                            
+                            Spacer(modifier = Modifier.width(12.dp))
+                            
+                            // Profile Image
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .clickable { 
+                                        selectedTab = "Profile"
+                                        coroutineScope.launch {
+                                            sheetHeightPx.animateTo(expandedHeightPx)
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Person,
+                                    contentDescription = "Profile",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
             
@@ -441,7 +571,12 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
                     label = "TabTransition"
                 ) { tab ->
                     when (tab) {
-                        "Explore" -> ExploreView()
+                        "Explore" -> {
+                            ExploreView(
+                                externalSelectedPost = activeExplorePost,
+                                onPostSelected = { activeExplorePost = it }
+                            )
+                        }
                         "Food" -> FoodView()
                         "Play" -> PlayView()
                         "Fitness" -> FitnessView()

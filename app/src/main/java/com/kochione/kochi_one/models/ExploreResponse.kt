@@ -12,17 +12,24 @@ data class ExploreData(
 
 data class ExplorePost(
     val id: String,
-    val mediaUrl: String,
-    val mediaType: String,
-    val logoUrl: String,
+    val accountId: String,
+    val accountName: String,
+    val accountLogoUrl: String,
     val eyebrow: String,
     val title: String,
-    val subtitle: String,
     val description: String,
     val detailBody: String,
+    val bannerImageUrl: String,
+    val bannerImageType: String,
+    val galleryImages: List<GalleryImage>,
     val redirectUrl: String,
-    val buttonLabel: String,
-    val accentColor: String
+    val buttonLabel: String
+)
+
+data class GalleryImage(
+    val id: String,
+    val url: String,
+    val type: String
 )
 
 data class Pagination(

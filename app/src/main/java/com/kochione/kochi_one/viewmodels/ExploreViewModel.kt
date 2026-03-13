@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 class ExploreViewModel : ViewModel() {
 
     private val _posts = MutableStateFlow<List<ExplorePost>>(emptyList())
+    
     val posts: StateFlow<List<ExplorePost>> = _posts.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
@@ -43,4 +44,6 @@ class ExploreViewModel : ViewModel() {
             }
         }
     }
-}
+
+    }
+

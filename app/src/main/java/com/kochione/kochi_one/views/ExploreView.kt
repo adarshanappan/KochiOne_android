@@ -16,6 +16,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,13 +42,29 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 
 @Composable
-fun ExploreView(viewModel: ExploreViewModel = viewModel()) {
+fun ExploreView(
+    viewModel: ExploreViewModel = viewModel(),
+    externalSelectedPost: ExplorePost? = null,
+    onPostSelected: (ExplorePost?) -> Unit = {}
+) {
     val posts by viewModel.posts.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
 
     var selectedPost by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<ExplorePost?>(null) }
+    
+    // Sync internal state with external parameter (e.g. when global back is pressed)
+    androidx.compose.runtime.LaunchedEffect(externalSelectedPost) {
+        if (externalSelectedPost != selectedPost) {
+            selectedPost = externalSelectedPost
+        }
+    }
+
+    // Sync with external listener (e.g. when card is clicked)
+    androidx.compose.runtime.LaunchedEffect(selectedPost) {
+        onPostSelected(selectedPost)
+    }
 
     val isDarkTheme = isSystemInDarkTheme()
     val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
@@ -59,16 +78,22 @@ fun ExploreView(viewModel: ExploreViewModel = viewModel()) {
             if (targetState != null) {
                 // Expanding into detail
                 slideInVertically(
-                    initialOffsetY = { 100 },
-                    animationSpec = tween(durationMillis = 300)
+                    initialOffsetY = { it },
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioLowBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
                 ) + fadeIn(animationSpec = tween(durationMillis = 300)) togetherWith
                         fadeOut(animationSpec = tween(durationMillis = 150))
             } else {
                 // Collapsing back to list
                 fadeIn(animationSpec = tween(durationMillis = 300)) togetherWith
                         slideOutVertically(
-                            targetOffsetY = { 100 },
-                            animationSpec = tween(durationMillis = 300)
+                            targetOffsetY = { it },
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                stiffness = Spring.StiffnessLow
+                            )
                         ) + fadeOut(animationSpec = tween(durationMillis = 300))
             }
         },
@@ -76,17 +101,10 @@ fun ExploreView(viewModel: ExploreViewModel = viewModel()) {
     ) { postToDisplay ->
         if (postToDisplay != null) {
             // Detailed View
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().background(bgColor),
-                contentPadding = PaddingValues(bottom = 80.dp)
-            ) {
-                item {
-                    ExplorePostDetail(
-                        post = postToDisplay,
-                        onClose = { selectedPost = null }
-                    )
-                }
-            }
+            ExplorePostDetail(
+                post = postToDisplay,
+                onClose = { selectedPost = null }
+            )
         } else {
             // List View
             LazyColumn(
@@ -149,7 +167,7 @@ fun ExploreSummaryCard(
                     .height(280.dp)
             ) {
                 AsyncImage(
-                    model = post.mediaUrl,
+                    model = post.bannerImageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -198,9 +216,9 @@ fun ExploreSummaryCard(
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (post.logoUrl.isNotEmpty()) {
+                if (post.accountLogoUrl.isNotEmpty()) {
                     AsyncImage(
-                        model = post.logoUrl,
+                        model = post.accountLogoUrl,
                         contentDescription = "Logo",
                         modifier = Modifier
                             .size(48.dp)
@@ -211,9 +229,9 @@ fun ExploreSummaryCard(
                 }
                 
                 Column(modifier = Modifier.weight(1f)) {
-                    if (post.subtitle.isNotEmpty()) {
+                    if (post.accountName.isNotEmpty()) {
                         Text(
-                            text = post.subtitle.uppercase(),
+                            text = post.accountName.uppercase(),
                             color = Color.Gray,
                             style = MaterialTheme.typography.labelSmall
                         )
