@@ -2,6 +2,7 @@ package com.kochione.kochi_one
 
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -45,13 +48,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -90,6 +97,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+enum class SheetMode {
+    Collapsed,
+    Half,
+    Expanded
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -106,6 +119,16 @@ class MainActivity : ComponentActivity() {
 fun MainScreen() {
     val isDarkTheme = isSystemInDarkTheme()
     val context = androidx.compose.ui.platform.LocalContext.current
+    var showCameraPermissionPopup by remember { mutableStateOf(false) }
+    var pendingQrScanAfterPermission by remember { mutableStateOf(false) }
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
     var hasLocationPermission by remember {
         mutableStateOf(
             androidx.core.content.ContextCompat.checkSelfPermission(
@@ -119,6 +142,10 @@ fun MainScreen() {
         )
     }
 
+    // Keep the floating capsule visible above the bottom sheet (collapsed + half only).
+    var sheetMode by remember { mutableStateOf(SheetMode.Collapsed) }
+    var sheetHeightDp by remember { mutableStateOf(200.dp) }
+
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -126,7 +153,23 @@ fun MainScreen() {
                                 permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] == true
     }
 
+    val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasCameraPermission = granted
+        if (granted && pendingQrScanAfterPermission) {
+            pendingQrScanAfterPermission = false
+            QrScanner.startScanning(
+                context = context,
+                onResult = { rawValue ->
+                    Toast.makeText(context, "QR: $rawValue", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+    }
+
     androidx.compose.runtime.LaunchedEffect(Unit) {
+        QrScanner.installGoogleScanner(context)
         if (!hasLocationPermission) {
             permissionLauncher.launch(
                 arrayOf(
@@ -191,7 +234,7 @@ fun MainScreen() {
                     try {
                         val intentSenderRequest = androidx.activity.result.IntentSenderRequest.Builder(exception.resolution).build()
                         settingResultRequest.launch(intentSenderRequest)
-                    } catch (sendEx: android.content.IntentSender.SendIntentException) {
+                    } catch (_: android.content.IntentSender.SendIntentException) {
                         // Ignore the error
                     }
                 }
@@ -235,8 +278,9 @@ fun MainScreen() {
                     )
             )
             
-            // Custom Location Button hovering above the bottom sheet
-            if (hasLocationPermission) {
+            // Single capsule split into QR scanner + Location (vertical, equal touch areas)
+            // Visible in collapsed + half, hidden in expanded.
+            if (hasLocationPermission && sheetMode != SheetMode.Expanded) {
                 val glassColor = if (isDarkTheme) Color(0xFF1E1E1E).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.7f)
                 val glassBorder = if (isDarkTheme) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.1f)
                 val iconTint = if (isDarkTheme) Color.White else Color.Black
@@ -244,50 +288,182 @@ fun MainScreen() {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 220.dp) // Height above collapsed bottom sheet
-                        .size(56.dp) // Standard FAB size
+                        // Float the capsule above the sheet as it moves.
+                        .padding(end = 16.dp, bottom = sheetHeightDp + 20.dp)
+                        .height(120.dp) // tall pill
+                        .width(56.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(glassColor)
-                        .border(1.dp, glassBorder, RoundedCornerShape(16.dp))
-                        .clickable {
-                            val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-                            try {
-                                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                                    if (location != null) {
-                                        val currentLatLng = LatLng(location.latitude, location.longitude)
-                                        coroutineScope.launch {
-                                            cameraPositionState.animate(
-                                                com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f),
-                                                1000
-                                            )
-                                        }
-                                    }
-                                }
-                            } catch (e: SecurityException) {
-                                e.printStackTrace()
-                            }
-                        },
+                        .border(1.dp, glassBorder, RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_location_custom),
-                        contentDescription = "My Location",
-                        modifier = Modifier.size(24.dp),
-                        tint = iconTint // Apply dynamic tinting
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Top half: QR scanner
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (hasCameraPermission) {
+                                        QrScanner.startScanning(
+                                            context = context,
+                                            onResult = { rawValue ->
+                                                Toast.makeText(context, "QR: $rawValue", Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    } else {
+                                        pendingQrScanAfterPermission = true
+                                        showCameraPermissionPopup = true
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_qr),
+                                contentDescription = "QR Scanner",
+                                modifier = Modifier.size(34.dp),
+                                tint = iconTint   // or remove if you want default tint
+                            )
+                        }
+
+                        // Divider inside the pill (horizontal)
+                        Box(
+                            modifier = Modifier
+                                .height(1.dp)
+                                .fillMaxWidth(0.6f)
+                                .background(glassBorder)
+                        )
+
+                        // Bottom half: Location
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clickable {
+                                    val fusedLocationClient =
+                                        com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                                    try {
+                                        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                            if (location != null) {
+                                                val currentLatLng = LatLng(location.latitude, location.longitude)
+                                                coroutineScope.launch {
+                                                    cameraPositionState.animate(
+                                                        com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f),
+                                                        1000
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } catch (e: SecurityException) {
+                                        e.printStackTrace()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_location_custom),
+                                contentDescription = "My Location",
+                                modifier = Modifier.size(24.dp),
+                                tint = iconTint
+                            )
+                        }
+                    }
                 }
             }
 
             ThreeStateBottomSheet(
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier.align(Alignment.BottomCenter),
+                onModeChanged = { sheetMode = it },
+                onHeightChanged = { sheetHeightDp = it }
             )
+
+            if (showCameraPermissionPopup) {
+                Dialog(onDismissRequest = { showCameraPermissionPopup = false }) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White,
+                        tonalElevation = 2.dp
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .width(300.dp)
+                                .padding(top = 16.dp, bottom = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_qr),
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(26.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = "Camera access is required to scan QR codes.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Black,
+                                modifier = Modifier.padding(horizontal = 20.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            HorizontalDivider(color = Color(0xFFE6E6E6))
+
+                            TextButton(
+                                onClick = {
+                                    showCameraPermissionPopup = false
+                                    cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("WHILE USING THE APP")
+                            }
+
+                            HorizontalDivider(color = Color(0xFFE6E6E6))
+
+                            TextButton(
+                                onClick = {
+                                    showCameraPermissionPopup = false
+                                    cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("ONLY THIS TIME")
+                            }
+
+                            HorizontalDivider(color = Color(0xFFE6E6E6))
+
+                            TextButton(
+                                onClick = {
+                                    pendingQrScanAfterPermission = false
+                                    showCameraPermissionPopup = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("DON'T ALLOW")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
+fun ThreeStateBottomSheet(
+    modifier: Modifier = Modifier,
+    onModeChanged: (SheetMode) -> Unit = {},
+    onHeightChanged: (androidx.compose.ui.unit.Dp) -> Unit = {}
+) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     
@@ -302,6 +478,7 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
     val collapsedHeightPx = with(density) { collapsedHeight.toPx() }
     
     val sheetHeightPx = remember { Animatable(collapsedHeightPx) }
+    var currentMode by remember { mutableStateOf(SheetMode.Collapsed) }
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableStateOf("Explore") }
     var activeExplorePost by remember { mutableStateOf<ExplorePost?>(null) }
@@ -323,6 +500,11 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
             progress.coerceIn(0f, 1f)
         }
     }
+
+    // Push live height up so overlays can float above the sheet.
+    androidx.compose.runtime.LaunchedEffect(sheetHeightPx.value) {
+        onHeightChanged(with(density) { sheetHeightPx.value.toDp() })
+    }
     
     Box(
         modifier = modifier
@@ -343,6 +525,16 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
                                 else -> collapsedHeightPx
                             }
                             sheetHeightPx.animateTo(targetHeight)
+
+                            val newMode = when (targetHeight) {
+                                expandedHeightPx -> SheetMode.Expanded
+                                halfExpandedHeightPx -> SheetMode.Half
+                                else -> SheetMode.Collapsed
+                            }
+                            if (newMode != currentMode) {
+                                currentMode = newMode
+                                onModeChanged(newMode)
+                            }
                         }
                     },
                     onDragCancel = {
@@ -480,7 +672,7 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
                             // Standard Search Bar Row (Shared Element Logic)
                             var searchQuery by remember { mutableStateOf("") }
                             val placeholders = listOf("Coffee nearby", "Best Dessert Spot?")
-                            var placeholderIndex by remember { mutableStateOf(0) }
+                            var placeholderIndex by remember { mutableIntStateOf(0) }
 
                             androidx.compose.runtime.LaunchedEffect(Unit) {
                                 while (true) {
