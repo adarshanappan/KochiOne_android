@@ -53,8 +53,8 @@ data class RestaurantAddress(
 )
 
 data class RestaurantLocation(
-    val latitude: Double,
-    val longitude: Double
+    @SerializedName(value = "latitude", alternate = ["lat"]) val latitude: Double,
+    @SerializedName(value = "longitude", alternate = ["lng", "lon"]) val longitude: Double
 )
 
 data class RestaurantContact(

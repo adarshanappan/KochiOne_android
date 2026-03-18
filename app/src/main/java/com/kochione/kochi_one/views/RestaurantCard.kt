@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,15 +39,19 @@ import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
 import com.kochione.kochi_one.models.Restaurant
 import com.kochione.kochi_one.ui.components.shimmerEffect
+import com.kochione.kochi_one.utils.LocationRepository
+import com.kochione.kochi_one.utils.distanceInKm
+import com.kochione.kochi_one.utils.isOpenAtNow
+import com.kochione.kochi_one.utils.minutesUntilCloseIfOpen
 import kotlinx.coroutines.launch
 
 @Composable
 fun RestaurantCard(
     restaurant: Restaurant,
+    isDarkTheme: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
     val textColor = if (isDarkTheme) Color.White else Color.Black
     val secondaryTextColor = if (isDarkTheme) Color.LightGray else Color.Gray
 
@@ -86,43 +91,43 @@ fun RestaurantCard(
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val closeTime24 = restaurant.operatingHours.monday.close
-                    
-                    val timeStatus = androidx.compose.runtime.remember(closeTime24, restaurant.operatingHours.monday.closed) {
+                    val todayHours = androidx.compose.runtime.remember(restaurant.operatingHours) {
+                        val cal = java.util.Calendar.getInstance()
+                        when (cal.get(java.util.Calendar.DAY_OF_WEEK)) {
+                            java.util.Calendar.MONDAY -> restaurant.operatingHours.monday
+                            java.util.Calendar.TUESDAY -> restaurant.operatingHours.tuesday
+                            java.util.Calendar.WEDNESDAY -> restaurant.operatingHours.wednesday
+                            java.util.Calendar.THURSDAY -> restaurant.operatingHours.thursday
+                            java.util.Calendar.FRIDAY -> restaurant.operatingHours.friday
+                            java.util.Calendar.SATURDAY -> restaurant.operatingHours.saturday
+                            java.util.Calendar.SUNDAY -> restaurant.operatingHours.sunday
+                            else -> restaurant.operatingHours.monday
+                        }
+                    }
+
+                    val closeTime24 = todayHours.close
+                    val timeStatus = run {
+                        val calendar = java.util.Calendar.getInstance()
+                        val nowMinutes =
+                            calendar.get(java.util.Calendar.HOUR_OF_DAY) * 60 +
+                                calendar.get(java.util.Calendar.MINUTE)
                         try {
-                            if (restaurant.operatingHours.monday.closed) {
-                                Pair("Closed", Color(0xFFFF6B6B)) // Light Red
-                            } else if (closeTime24 != null) {
-                                val parts = closeTime24.split(":")
-                                if (parts.size >= 2) {
-                                    val closeHour = parts[0].toIntOrNull() ?: 0
-                                    val closeMinute = parts[1].toIntOrNull() ?: 0
-                                    
-                                    val calendar = java.util.Calendar.getInstance()
-                                    val currentHour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
-                                    val currentMinute = calendar.get(java.util.Calendar.MINUTE)
-                                    
-                                    val currentTotalMinutes = currentHour * 60 + currentMinute
-                                    val closeTotalMinutes = closeHour * 60 + closeMinute
-                                    
-                                    var diff = closeTotalMinutes - currentTotalMinutes
-                                    if (diff < 0) {
-                                        diff += 24 * 60 // If closing is past midnight
-                                    }
-                                    
-                                    if (diff in 0..60) {
-                                        Pair("Closing Soon", Color(0xFFFFD54F)) // Light Yellow
+                            when {
+                                todayHours.closed ->
+                                    Pair("Closed", Color(0xFFFF6B6B))
+                                !todayHours.isOpenAtNow(nowMinutes) ->
+                                    Pair("Closed", Color(0xFFFF6B6B))
+                                else -> {
+                                    val untilClose = todayHours.minutesUntilCloseIfOpen(nowMinutes)
+                                    if (untilClose != null && untilClose in 0..60) {
+                                        Pair("Closes soon", Color(0xFFFFD54F))
                                     } else {
-                                        Pair("Open", Color(0xFF00C853)) // Green
+                                        Pair("Open", Color(0xFF00C853))
                                     }
-                                } else {
-                                    Pair("close", Color(0xFFFF6B6B))
                                 }
-                            } else {
-                                Pair("Open", Color(0xFF00C853))
                             }
                         } catch (e: Exception) {
-                            if (restaurant.operatingHours.monday.closed) Pair("Closed", Color(0xFFFF6B6B)) else Pair("Open", Color(0xFF00C853))
+                            Pair("Closed", Color(0xFFFF6B6B))
                         }
                     }
 
@@ -165,30 +170,42 @@ fun RestaurantCard(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "· closes $formattedCloseTime",
-                        color = secondaryTextColor,
-                        fontSize = 14.sp
-                    )
+                    if (timeStatus.first != "Closed") {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "· closes $formattedCloseTime",
+                            color = secondaryTextColor,
+                            fontSize = 14.sp
+                        )
+                    }
                 }
             }
 
-            // Distance
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "1.8 km",
-                    color = secondaryTextColor,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
+            // Distance from user's GPS (hidden when location not yet available)
+            val userLocation by LocationRepository.location.collectAsState()
+            val distanceKm = userLocation?.let { loc ->
+                distanceInKm(
+                    loc.first, loc.second,
+                    restaurant.location.latitude,
+                    restaurant.location.longitude
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_transit), // Replace with a direction arrow if available
-                    contentDescription = "Distance",
-                    tint = textColor,
-                    modifier = Modifier.size(16.dp)
-                )
+            }
+            if (distanceKm != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "%.1f km".format(distanceKm),
+                        color = secondaryTextColor,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_transit),
+                        contentDescription = "Distance",
+                        tint = textColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
 
@@ -274,8 +291,8 @@ fun RestaurantCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconAction(painterResId = R.drawable.ic_call, contentDescription = "Call")
-            IconAction(painterResId = R.drawable.ic_location_custom, contentDescription = "Directions")
+            IconAction(painterResId = R.drawable.ic_call, contentDescription = "Call", isDarkTheme = isDarkTheme)
+            IconAction(painterResId = R.drawable.ic_location_custom, contentDescription = "Directions", isDarkTheme = isDarkTheme)
             var isFavorited by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
             val heartIcon = if (isFavorited) R.drawable.ic_heart_filled else R.drawable.ic_heart
             val heartTint = if (isFavorited) Color.Red else (if (isDarkTheme) Color.LightGray else Color.Gray)
@@ -362,7 +379,7 @@ fun RestaurantCard(
                     }
                     .padding(12.dp)
             )
-            IconAction(painterResId = R.drawable.ic_share, contentDescription = "Share")
+            IconAction(painterResId = R.drawable.ic_share, contentDescription = "Share", isDarkTheme = isDarkTheme)
         }
         androidx.compose.material3.HorizontalDivider(
             color = Color.Gray,
@@ -376,8 +393,7 @@ fun RestaurantCard(
 }
 
 @Composable
-fun IconAction(painterResId: Int, contentDescription: String) {
-    val isDarkTheme = isSystemInDarkTheme()
+fun IconAction(painterResId: Int, contentDescription: String, isDarkTheme: Boolean) {
     val tint = if (isDarkTheme) Color.LightGray else Color.Gray
     Icon(
         painter = painterResource(id = painterResId),
@@ -394,8 +410,7 @@ fun IconAction(painterResId: Int, contentDescription: String) {
 }
 
 @Composable
-fun RestaurantSkeletonCard(modifier: Modifier = Modifier) {
-    val isDarkTheme = isSystemInDarkTheme()
+fun RestaurantSkeletonCard(isDarkTheme: Boolean, modifier: Modifier = Modifier) {
 
     Column(
         modifier = modifier

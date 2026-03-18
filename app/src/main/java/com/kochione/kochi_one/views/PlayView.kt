@@ -1,10 +1,6 @@
 package com.kochione.kochi_one.views
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Animatable
@@ -13,6 +9,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -46,11 +46,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,6 +58,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -69,10 +69,10 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
-import com.kochione.kochi_one.ui.components.SkeletonBox
 import com.kochione.kochi_one.models.DayHours
 import com.kochione.kochi_one.models.OperatingHours
 import com.kochione.kochi_one.models.PlayVenue
+import com.kochione.kochi_one.ui.components.SkeletonBox
 import com.kochione.kochi_one.viewmodels.PlayViewModel
 import java.util.Calendar
 
@@ -101,6 +101,7 @@ private data class PlayCardData(
 
 @Composable
 fun PlayView(
+    isDarkTheme: Boolean,
     viewModel: PlayViewModel = viewModel(),
     onDetailVisibilityChanged: (Boolean) -> Unit = {},
     onRegisterDismissDetail: ((() -> Unit)?) -> Unit = {}
@@ -110,8 +111,7 @@ fun PlayView(
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
-    val isDarkTheme = isSystemInDarkTheme()
-    // Match bottom sheet surface (#1E1E1E) — avoid near-black #121212 around cards
+    // Theme handled by parameter
     val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val cardBgColor = if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFE0E0E0)
     val textColor = if (isDarkTheme) Color.White else Color.Black
@@ -120,6 +120,9 @@ fun PlayView(
     androidx.compose.runtime.LaunchedEffect(selectedCard) {
         onDetailVisibilityChanged(selectedCard != null)
     }
+
+    // System back: dismiss detail → return to list
+    BackHandler(enabled = selectedCard != null) { selectedCard = null }
 
     DisposableEffect(selectedCard) {
         if (selectedCard != null) {
@@ -206,6 +209,7 @@ fun PlayView(
                         ) {
                             PlayFeatureCard(
                                 card = hero,
+                                isDarkTheme = isDarkTheme,
                                 modifier = Modifier
                                     .weight(0.50f)
                                     .fillMaxHeight(),
@@ -219,6 +223,7 @@ fun PlayView(
                             ) {
                                 PlayFeatureCard(
                                     card = stackTop,
+                                    isDarkTheme = isDarkTheme,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f),
@@ -226,6 +231,7 @@ fun PlayView(
                                 )
                                 PlayFeatureCard(
                                     card = stackBottom,
+                                    isDarkTheme = isDarkTheme,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f),
@@ -237,6 +243,7 @@ fun PlayView(
                         cards.drop(3).forEach { card ->
                             PlayFeatureCard(
                                 card = card,
+                                isDarkTheme = isDarkTheme,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(172.dp),
@@ -269,9 +276,9 @@ fun PlayView(
             if (card != null) {
                 val detailVenues = buildDetailVenuesForCard(card, venues)
                 if (detailVenues.isNotEmpty()) {
-                    PlayVenueFullScreenSheet(venues = detailVenues)
+                    PlayVenueFullScreenSheet(venues = detailVenues, isDarkTheme = isDarkTheme)
                 } else {
-                    PlayVenueEmptyFullScreenSheet(card = card)
+                    PlayVenueEmptyFullScreenSheet(card = card, isDarkTheme = isDarkTheme)
                 }
             } else {
                 Spacer(modifier = Modifier.size(0.dp))
@@ -327,10 +334,11 @@ private fun PlayViewCardsSkeleton(isDarkTheme: Boolean) {
 
 @Composable
 private fun PlayVenueEmptyFullScreenSheet(
-    card: PlayCardData
+    card: PlayCardData,
+    isDarkTheme: Boolean
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
+    val textColor = if (isDarkTheme) Color.White else Color(0xFF1A1A1A)
     val titleColor = if (isDarkTheme) Color.White.copy(alpha = 0.92f) else Color(0xFF1A1A1A)
     val subtitleColor = if (isDarkTheme) Color.White.copy(alpha = 0.58f) else Color(0xFF666666)
 
@@ -352,7 +360,7 @@ private fun PlayVenueEmptyFullScreenSheet(
                     Icon(
                         painter = painterResource(id = R.drawable.ic_no_venues_field),
                         contentDescription = null,
-                        tint = Color.Unspecified,
+                        tint = textColor.copy(alpha = 0.92f),
                         modifier = Modifier.size(58.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -376,6 +384,7 @@ private fun PlayVenueEmptyFullScreenSheet(
 @Composable
 private fun PlayFeatureCard(
     card: PlayCardData,
+    isDarkTheme: Boolean,
     modifier: Modifier = Modifier,
     onCardClick: (() -> Unit)? = null
 ) {
@@ -398,8 +407,8 @@ private fun PlayFeatureCard(
             .then(if (onCardClick != null) Modifier.clickable { onCardClick() } else Modifier)
     ) {
         when (card.variant) {
-            PlayCardVariant.FULL_SNOOKER -> SnookerCardContent(card)
-            PlayCardVariant.FULL_GAME -> GameCentreCardContent(card)
+            PlayCardVariant.FULL_SNOOKER -> SnookerCardContent(card, isDarkTheme)
+            PlayCardVariant.FULL_GAME -> GameCentreCardContent(card, isDarkTheme)
             else -> {
                 val localId = card.localImageResId
                 if (localId != null) {
@@ -417,12 +426,12 @@ private fun PlayFeatureCard(
                         contentScale = ContentScale.Crop
                     )
                 }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
                         .background(textGradient)
                 )
-                PlayCardBottomContent(card = card)
+                PlayCardBottomContent(card = card, isDarkTheme = isDarkTheme)
             }
         }
     }
@@ -430,11 +439,15 @@ private fun PlayFeatureCard(
 
 @Composable
 private fun PlayVenueFullScreenSheet(
-    venues: List<PlayVenue>
+    venues: List<PlayVenue>,
+    isDarkTheme: Boolean
 ) {
     val context = LocalContext.current
-    val isDarkTheme = isSystemInDarkTheme()
-    val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
+    val pageBg     = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
+    val textColor  = if (isDarkTheme) Color.White else Color(0xFF1A1A1A)
+    val dimColor   = if (isDarkTheme) Color.White.copy(alpha = 0.62f) else Color(0xFF555555)
+    val iconBgColor = if (isDarkTheme) Color(0xFF2A2A2A) else Color(0xFFF0F0F0)
+    val iconTintColor = if (isDarkTheme) Color.White.copy(alpha = 0.9f) else Color(0xFF1A1A1A)
     val likedMap = remember { mutableStateMapOf<String, Boolean>() }
     val savedMap = remember { mutableStateMapOf<String, Boolean>() }
 
@@ -479,31 +492,31 @@ private fun PlayVenueFullScreenSheet(
                                 Surface(
                                     modifier = Modifier.size(46.dp),
                                     shape = CircleShape,
-                                    color = Color(0xFF2A2A2A)
+                                    color = iconBgColor
                                 ) {
                                     val logo = venue.logo?.url
                                     if (!logo.isNullOrBlank()) {
-                AsyncImage(
+                                        AsyncImage(
                                             model = logo,
                                             contentDescription = venue.name,
-                    modifier = Modifier.fillMaxSize(),
+                                            modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
                                         )
                                     } else {
                                         Icon(
                                             painter = painterResource(id = R.drawable.ic_play),
                                             contentDescription = null,
-                                            tint = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier
+                                            tint = iconTintColor,
+                                            modifier = Modifier
                                                 .padding(10.dp)
-                        .fillMaxSize()
+                                                .fillMaxSize()
                                         )
                                     }
                                 }
                                 Column {
                                     Text(
                                         text = venue.name,
-                                        color = Color.White,
+                                        color = textColor,
                                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -517,13 +530,17 @@ private fun PlayVenueFullScreenSheet(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
                                             text = statusText,
-                                            color = if (openNow) Color(0xFF86EFAC) else Color(0xFFFF6B6B),
+                                            color = if (openNow) {
+                                                if (isDarkTheme) Color(0xFF86EFAC) else Color(0xFF16A34A)
+                                            } else {
+                                                if (isDarkTheme) Color(0xFFFF6B6B) else Color(0xFFDC2626)
+                                            },
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Text(
                                             text = " \u00b7 $statusSuffix",
-                                            color = Color.White.copy(alpha = 0.62f),
+                                            color = dimColor,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     }
@@ -535,13 +552,13 @@ private fun PlayVenueFullScreenSheet(
                             ) {
                                 Text(
                                     text = "${"%.1f".format(venue.rating)} km",
-                                    color = Color.White.copy(alpha = 0.7f),
+                                    color = dimColor,
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_near_me),
                                     contentDescription = null,
-                                    tint = Color.Unspecified,
+                                    tint = textColor,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -551,7 +568,7 @@ private fun PlayVenueFullScreenSheet(
 
                         Text(
                             text = venue.description.ifBlank { "No description available." },
-                            color = Color.White.copy(alpha = 0.72f),
+                            color = dimColor,
                             style = MaterialTheme.typography.bodyLarge
                         )
 
@@ -604,6 +621,7 @@ private fun PlayVenueFullScreenSheet(
                             Spacer(modifier = Modifier.height(12.dp))
                         }
 
+                        val actionTint = if (isDarkTheme) Color.White.copy(alpha = 0.76f) else Color.Black.copy(alpha = 0.62f)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -613,33 +631,37 @@ private fun PlayVenueFullScreenSheet(
                         ) {
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_call,
+                                tint = actionTint,
                                 onClick = { callVenue(context, venue.contact.phone) }
                             )
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_near_me,
+                                tint = actionTint,
                                 onClick = { openVenueMap(context, venue.location.latitude, venue.location.longitude, venue.name) }
                             )
                             SheetActionIcon(
                                 iconRes = if (liked) R.drawable.ic_heart_filled else R.drawable.ic_heart,
-                                tint = if (liked) Color(0xFFFF3B30) else Color.White.copy(alpha = 0.76f),
+                                tint = if (liked) Color(0xFFFF3B30) else actionTint,
                                 isActive = liked,
                                 animateOnActivate = true,
                                 onClick = { likedMap[venue.id] = !liked }
                             )
                             SheetActionIcon(
                                 iconRes = if (saved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+                                tint = if (saved) Color(0xFFEAB308) else actionTint,
                                 isActive = saved,
                                 animateOnActivate = true,
                                 onClick = { savedMap[venue.id] = !saved }
                             )
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_share,
+                                tint = actionTint,
                                 onClick = { shareVenue(context, venue) }
                             )
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        HorizontalDivider(color = textColor.copy(alpha = 0.08f))
                     }
                 }
                 item { Spacer(modifier = Modifier.height(20.dp)) }
@@ -654,7 +676,7 @@ private fun buildDetailVenuesForCard(card: PlayCardData, allVenues: List<PlayVen
             val n = venue.name.lowercase()
             val c = venue.playCategory.lowercase()
             n.contains("soccer") || n.contains("football") || n.contains("futsal") ||
-                c.contains("soccer") || c.contains("football") || c.contains("futsal")
+                    c.contains("soccer") || c.contains("football") || c.contains("futsal")
         }
         return if (soccerVenues.isNotEmpty()) soccerVenues else listOfNotNull(card.venue)
     }
@@ -787,7 +809,7 @@ private fun shareVenue(context: android.content.Context, venue: PlayVenue) {
 }
 
 @Composable
-private fun BoxScope.PlayCardBottomContent(card: PlayCardData) {
+private fun BoxScope.PlayCardBottomContent(card: PlayCardData, isDarkTheme: Boolean) {
     Column(
         modifier = Modifier
             .align(Alignment.BottomStart)
@@ -933,7 +955,7 @@ private fun GameCentreActionRow() {
 }
 
 @Composable
-private fun SnookerCardContent(card: PlayCardData) {
+private fun SnookerCardContent(card: PlayCardData, isDarkTheme: Boolean) {
     val snookerGreen = Color(0xFF1B4332)
     val snookerGradient = Brush.horizontalGradient(
 //        0f to Color(0xFF1B4332),
@@ -1063,7 +1085,7 @@ private fun SnookerActionRow(chevronTint: Color) {
 }
 
 @Composable
-private fun GameCentreCardContent(card: PlayCardData) {
+private fun GameCentreCardContent(card: PlayCardData, isDarkTheme: Boolean) {
     val gameCentreGradient = Brush.horizontalGradient(
         colors = listOf(
 //            Color(0xFFDC2626),
@@ -1106,13 +1128,13 @@ private fun GameCentreCardContent(card: PlayCardData) {
             painter = painterResource(id = R.drawable.ic_game_controller),
             contentDescription = null,
             tint = controllerTint,
-                    modifier = Modifier
+            modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 10.dp)
                 .size(120.dp)
         )
         Column(
-                    modifier = Modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.SpaceBetween
@@ -1210,10 +1232,10 @@ private fun buildPlayCards(
             val normalizedKey = key.lowercase()
             normalizedEntries.firstOrNull { (categoryKey, imageUrl) ->
                 imageUrl.isNotBlank() && (
-                    categoryKey == normalizedKey ||
-                        categoryKey.contains(normalizedKey) ||
-                        normalizedKey.contains(categoryKey)
-                    )
+                        categoryKey == normalizedKey ||
+                                categoryKey.contains(normalizedKey) ||
+                                normalizedKey.contains(categoryKey)
+                        )
             }?.second
         }
     }
@@ -1259,7 +1281,7 @@ private fun buildPlayCards(
         when {
             i == 0 -> {
                 val thumbnailUrl = slotThumbnailUrls[i]
-            fb.copy(
+                fb.copy(
                     // Keep hero card text concise in-card; full API details are shown in the sheet.
                     title = fb.title,
                     subtitle = fb.subtitle,

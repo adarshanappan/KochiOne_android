@@ -1,5 +1,6 @@
 package com.kochione.kochi_one.viewmodels
 
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.JsonElement
@@ -17,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 class FitnessViewModel : ViewModel() {
     private companion object {
-        const val API_ORIGIN = "https://admin.kochi.one"
+        const val API_ORIGIN = "https://api.kochi.one"
     }
 
     private val _venues = MutableStateFlow<List<FitnessVenue>>(emptyList())
@@ -125,8 +126,8 @@ class FitnessViewModel : ViewModel() {
                         "coverImage",
                         "coverImageUrl"
                     ) ?: urlFromElement(obj.get("thumbnail"))
-                        ?: urlFromElement(obj.get("image"))
-                        ?: urlFromElement(obj.get("coverImage"))
+                    ?: urlFromElement(obj.get("image"))
+                    ?: urlFromElement(obj.get("coverImage"))
                     add(category, directUrl)
 
                     obj.entrySet().forEach { (key, value) ->

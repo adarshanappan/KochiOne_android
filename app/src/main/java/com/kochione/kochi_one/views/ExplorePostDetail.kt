@@ -40,8 +40,7 @@ import com.kochione.kochi_one.models.ExplorePost
 import com.kochione.kochi_one.ui.components.shimmerEffect
 
 @Composable
-fun ExplorePostDetail(post: ExplorePost, onClose: () -> Unit) {
-    val isDarkTheme = isSystemInDarkTheme()
+fun ExplorePostDetail(post: ExplorePost, isDarkTheme: Boolean, onClose: () -> Unit) {
     val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val textColor = if (isDarkTheme) Color.White else Color.Black
     val subtleTextColor = if (isDarkTheme) Color.LightGray else Color.DarkGray

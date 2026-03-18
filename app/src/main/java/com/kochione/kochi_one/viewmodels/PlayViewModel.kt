@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 
 class PlayViewModel : ViewModel() {
     private companion object {
-        const val API_ORIGIN = "https://admin.kochi.one"
+        const val API_ORIGIN = "https://api.kochi.one"
     }
 
     private val _venues = MutableStateFlow<List<PlayVenue>>(emptyList())
@@ -135,8 +135,8 @@ class PlayViewModel : ViewModel() {
                         "coverImage",
                         "coverImageUrl"
                     ) ?: urlFromElement(obj.get("thumbnail"))
-                        ?: urlFromElement(obj.get("image"))
-                        ?: urlFromElement(obj.get("coverImage"))
+                    ?: urlFromElement(obj.get("image"))
+                    ?: urlFromElement(obj.get("coverImage"))
                     add(category, directUrl)
 
                     obj.entrySet().forEach { (key, value) ->

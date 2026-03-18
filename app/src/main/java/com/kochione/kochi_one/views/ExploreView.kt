@@ -57,6 +57,7 @@ import com.kochione.kochi_one.viewmodels.ExploreViewModel
 
 @Composable
 fun ExploreView(
+    isDarkTheme: Boolean,
     viewModel: ExploreViewModel = viewModel(),
     externalSelectedPost: ExplorePost? = null,
     onPostSelected: (ExplorePost?) -> Unit = {}
@@ -80,7 +81,7 @@ fun ExploreView(
         onPostSelected(selectedPost)
     }
 
-    val isDarkTheme = isSystemInDarkTheme()
+    // Theme handled by parameter
     val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val cardBgColor = if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFE0E0E0)
     val textColor = if (isDarkTheme) Color.White else Color.Black
@@ -117,6 +118,7 @@ fun ExploreView(
             // Detailed View
             ExplorePostDetail(
                 post = postToDisplay,
+                isDarkTheme = isDarkTheme,
                 onClose = { selectedPost = null }
             )
         } else {
