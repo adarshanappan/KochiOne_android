@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.kochi_one.kochi_one"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -60,6 +60,10 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.5")
+
+    // Google Code Scanner (Play Services)
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
