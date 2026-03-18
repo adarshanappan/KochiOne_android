@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">KochiOne</string>
+    <string name="location_rationale_description">KochiOne uses your location to show nearby cafes, restaurants and places around you.</string>
 </resources>

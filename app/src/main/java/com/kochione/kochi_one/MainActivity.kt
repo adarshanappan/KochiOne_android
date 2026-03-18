@@ -2,10 +2,13 @@ package com.kochione.kochi_one
 
 
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -13,8 +16,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,10 +36,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +45,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,26 +59,29 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.kochione.kochi_one.models.ExplorePost
+import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.LocationSettingsResponse
 import com.google.android.gms.location.Priority
-import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.tasks.Task
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.kochione.kochi_one.models.ExplorePost
 import com.kochione.kochi_one.ui.theme.KochiOneTheme
 import com.kochione.kochi_one.views.ExploreView
 import com.kochione.kochi_one.views.FitnessView
@@ -93,6 +96,7 @@ import kotlin.math.abs
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.decorView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         enableEdgeToEdge()
         setContent {
             KochiOneTheme {
@@ -104,6 +108,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainScreen() {
+    val haptic = LocalHapticFeedback.current
+    
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+
     val isDarkTheme = isSystemInDarkTheme()
     val context = androidx.compose.ui.platform.LocalContext.current
     var hasLocationPermission by remember {
@@ -119,6 +129,8 @@ fun MainScreen() {
         )
     }
 
+    var showLocationRationale by remember { mutableStateOf(false) }
+
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -128,13 +140,38 @@ fun MainScreen() {
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         if (!hasLocationPermission) {
-            permissionLauncher.launch(
-                arrayOf(
-                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                    android.Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
+            showLocationRationale = true
         }
+    }
+
+    if (showLocationRationale) {
+        AlertDialog(
+            onDismissRequest = { /* Don't dismiss without choice */ },
+            title = { Text("Location Access", fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.location_rationale_description)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLocationRationale = false
+                        permissionLauncher.launch(
+                            arrayOf(
+                                android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                android.Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    }
+                ) {
+                    Text("Allow", color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLocationRationale = false }) {
+                    Text("Skip", color = Color.Gray)
+                }
+            },
+            containerColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White,
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 
     val kochiLocation = LatLng(9.9312, 76.2673)
@@ -414,7 +451,7 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    painter = painterResource(id = R.drawable.ic_back_outline),
                                     contentDescription = "Back",
                                     tint = textColor,
                                     modifier = Modifier.size(24.dp)
@@ -479,7 +516,7 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
                         ) {
                             // Standard Search Bar Row (Shared Element Logic)
                             var searchQuery by remember { mutableStateOf("") }
-                            val placeholders = listOf("Coffee nearby", "Best Dessert Spot?")
+                            val placeholders = listOf("Coffee nearby", "Best Dessert Spot?","Restaurants near me","Best Pizza Place?","Dinner places","Bakery near me","Best café?","Family restaurant nearby","Romantic dinner place")
                             var placeholderIndex by remember { mutableStateOf(0) }
 
                             androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -517,7 +554,7 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
                                         )
                                     }
                                 },
-                                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search Icon", tint = textColor) },
+                                leadingIcon = { Icon(painter = painterResource(id = R.drawable.ic_forum_outline), contentDescription = "Forum Icon", tint = textColor) },
                                 textStyle = androidx.compose.ui.text.TextStyle(color = textColor),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedContainerColor = searchBarBgColor,
@@ -599,7 +636,7 @@ fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore") { selectedTab = "Explore" }
-                NavItem(R.drawable.ic_eat, "Food", selectedTab == "Food") { selectedTab = "Food" }
+                NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food") { selectedTab = "Food" }
                 NavItem(R.drawable.ic_play, "Play", selectedTab == "Play") { selectedTab = "Play" }
                 NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness") { selectedTab = "Fitness" }
                 NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit") { selectedTab = "Transit" }

@@ -37,6 +37,7 @@ import coil.compose.AsyncImage
 import com.kochione.kochi_one.models.ExploreContentBlock
 import com.kochione.kochi_one.models.ExploreContentParser
 import com.kochione.kochi_one.models.ExplorePost
+import com.kochione.kochi_one.ui.components.shimmerEffect
 
 @Composable
 fun ExplorePostDetail(post: ExplorePost, onClose: () -> Unit) {
@@ -74,7 +75,9 @@ fun ExplorePostDetail(post: ExplorePost, onClose: () -> Unit) {
                     model = post.bannerImageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shimmerEffect(isDarkTheme)
                 )
 
                 // Gradient Overlay for text readability
@@ -163,7 +166,8 @@ fun ExplorePostDetail(post: ExplorePost, onClose: () -> Unit) {
                                 contentDescription = "Logo",
                                 modifier = Modifier
                                     .size(32.dp)
-                                    .clip(CircleShape),
+                                    .clip(CircleShape)
+                                    .shimmerEffect(isDarkTheme),
                                 contentScale = ContentScale.Crop
                             )
                         }

@@ -3,18 +3,15 @@ package com.kochione.kochi_one.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kochione.kochi_one.api.RetrofitClient
-import com.kochione.kochi_one.models.ExplorePost
+import com.kochione.kochi_one.models.Restaurant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class ExploreViewModel : ViewModel() {
-
-    private val _posts = MutableStateFlow<List<ExplorePost>>(emptyList())
-    
-    val posts: StateFlow<List<ExplorePost>> = _posts.asStateFlow()
+class FoodViewModel : ViewModel() {
+    private val _restaurants = MutableStateFlow<List<Restaurant>>(emptyList())
+    val restaurants: StateFlow<List<Restaurant>> = _restaurants.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -23,35 +20,34 @@ class ExploreViewModel : ViewModel() {
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     init {
-        fetchPosts()
+        fetchRestaurants()
     }
 
-    fun fetchPosts() {
+    fun fetchRestaurants() {
         viewModelScope.launch {
             val startTime = System.currentTimeMillis()
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                // Call API
-                val response = RetrofitClient.instance.getExplorePosts()
+                val response = RetrofitClient.foodInstance.getRestaurants()
                 if (response.status == "success") {
-                    _posts.value = response.data.posts
+                    _restaurants.value = response.data.restaurants
                 } else {
-                    _errorMessage.value = "Failed to load posts"
+                    val elapsedTime = System.currentTimeMillis() - startTime
+                    if (elapsedTime < 7000) {
+                        kotlinx.coroutines.delay(7000 - elapsedTime)
+                    }
+                    _errorMessage.value = "Failed to load restaurants"
                 }
             } catch (e: Exception) {
+                val elapsedTime = System.currentTimeMillis() - startTime
+                if (elapsedTime < 7000) {
+                    kotlinx.coroutines.delay(7000 - elapsedTime)
+                }
                 _errorMessage.value = "Network error: ${e.localizedMessage}"
             } finally {
-                // Ensure skeleton is visible for at least 10 seconds
-                val elapsedTime = System.currentTimeMillis() - startTime
-                val remainingTime = 10000 - elapsedTime
-                if (remainingTime > 0) {
-                    delay(remainingTime)
-                }
                 _isLoading.value = false
             }
         }
     }
-
-    }
-
+}

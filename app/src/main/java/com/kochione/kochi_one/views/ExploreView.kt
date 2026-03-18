@@ -1,45 +1,59 @@
 package com.kochione.kochi_one.views
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kochione.kochi_one.models.ExplorePost
+import com.kochione.kochi_one.ui.components.shimmerEffect
 import com.kochione.kochi_one.viewmodels.ExploreViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.runtime.collectAsState
 
 @Composable
 fun ExploreView(
@@ -121,10 +135,49 @@ fun ExploreView(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
-                if (isLoading) {
+                if (isLoading && posts.isEmpty()) {
                     items(3) { // Show 3 skeleton cards while loading
                         ExploreSkeletonCard(isDarkTheme = isDarkTheme)
                         Spacer(modifier = Modifier.height(16.dp))
+                    }
+                } else if (!isLoading && (errorMessage != null || posts.isEmpty())) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp, horizontal = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = textColor.copy(alpha = 0.2f)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Oops! Something went wrong",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = textColor.copy(alpha = 0.6f),
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Button(
+                                onClick = { viewModel.fetchPosts() },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = cardBgColor,
+                                    contentColor = textColor
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Refresh", fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
                     }
                 } else {
                     items(posts) { post ->
@@ -349,42 +402,4 @@ fun ExploreSkeletonCard(isDarkTheme: Boolean) {
     }
 }
 
-fun Modifier.shimmerEffect(isDarkTheme: Boolean): Modifier = composed {
-    var size by androidx.compose.runtime.remember {
-        androidx.compose.runtime.mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)
-    }
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val startOffsetX by transition.animateFloat(
-        initialValue = -2 * size.width.toFloat(),
-        targetValue = 2 * size.width.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500)
-        ),
-        label = "shimmer_offset"
-    )
-
-    val shimmerColors = if (isDarkTheme) {
-        listOf(
-            Color(0xFF333333),
-            Color(0xFF444444),
-            Color(0xFF333333)
-        )
-    } else {
-        listOf(
-            Color(0xFFCCCCCC),
-            Color(0xFFEEEEEE),
-            Color(0xFFCCCCCC)
-        )
-    }
-
-    background(
-        brush = Brush.linearGradient(
-            colors = shimmerColors,
-            start = Offset(startOffsetX, 0f),
-            end = Offset(startOffsetX + size.width.toFloat(), size.height.toFloat())
-        )
-    )
-    .onGloballyPositioned {
-        size = it.size
-    }
-}
+//}
