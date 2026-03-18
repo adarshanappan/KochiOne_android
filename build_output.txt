@@ -1,0 +1,46 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+
+> Task :app:compileDebugKotlin FAILED
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:318:42 Unresolved reference 'sheetMode'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:318:55 Unresolved reference 'SheetMode'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:327:56 Unresolved reference 'sheetHeightDp'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:327:56 Argument type mismatch: actual type is 'String', but 'Dp' was expected.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:348:41 Unresolved reference 'hasCameraPermission'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:352:49 Unresolved reference 'Toast'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:352:90 Unresolved reference 'Toast'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:356:41 Unresolved reference 'pendingQrScanAfterPermission'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:357:41 Unresolved reference 'showCameraPermissionPopup'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/MainActivity.kt:363:75 Unresolved reference 'ic_qr'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:7:19 Unresolved reference 'mlkit'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:8:19 Unresolved reference 'mlkit'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:9:19 Unresolved reference 'mlkit'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:19:21 Unresolved reference 'GmsBarcodeScanning'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:39:23 Unresolved reference 'GmsBarcodeScannerOptions'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:40:32 Unresolved reference 'Barcode'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:44:23 Unresolved reference 'GmsBarcodeScanning'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:47:37 Cannot infer type for this parameter. Specify it explicitly.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:48:37 Unresolved reference 'rawValue'.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:49:45 Argument type mismatch: actual type is 'Any', but 'String' was expected.
+e: file:///Users/adarsh/AndroidStudioProjects/KochiOne/app/src/main/java/com/kochione/kochi_one/qr/Qrscanner.kt:52:37 Cannot infer type for this parameter. Specify it explicitly.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 4s
+6 actionable tasks: 1 executed, 5 up-to-date

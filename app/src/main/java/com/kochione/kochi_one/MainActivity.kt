@@ -174,6 +174,18 @@ fun MainScreen() {
         )
     }
 
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val screenHeightDp = configuration.screenHeightDp.dp
+    val expandedHeightPx = with(density) { (screenHeightDp * 0.95f).toPx() }
+    val halfExpandedHeightPx = with(density) { (screenHeightDp * 0.6f).toPx() }
+    val collapsedHeightPx = with(density) { 200.dp.toPx() }
+    
+    val sheetHeightPx = remember { Animatable(collapsedHeightPx) }
+    val currentSheetHeightDp = with(density) { sheetHeightPx.value.toDp() }
+    // Capsule starts disappearing when sheet crosses 50% of the total height
+    val isSheetExpanded = sheetHeightPx.value > expandedHeightPx * 0.65f
+
     val kochiLocation = LatLng(9.9312, 76.2673)
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(kochiLocation, 12f)
@@ -273,49 +285,155 @@ fun MainScreen() {
             )
             
             // Custom Location Button hovering above the bottom sheet
-            if (hasLocationPermission) {
-                val glassColor = if (isDarkTheme) Color(0xFF1E1E1E).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.7f)
-                val glassBorder = if (isDarkTheme) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.1f)
-                val iconTint = if (isDarkTheme) Color.White else Color.Black
+//            if (hasLocationPermission) {
+//                val glassColor = if (isDarkTheme) Color(0xFF1E1E1E).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.7f)
+//                val glassBorder = if (isDarkTheme) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.1f)
+//                val iconTint = if (isDarkTheme) Color.White else Color.Black
+//
+//                Box(
+//                    modifier = Modifier
+//                        .align(Alignment.BottomEnd)
+//                        .padding(end = 16.dp, bottom = 220.dp) // Height above collapsed bottom sheet
+//                        .size(56.dp) // Standard FAB size
+//                        .clip(RoundedCornerShape(16.dp))
+//                        .background(glassColor)
+//                        .border(1.dp, glassBorder, RoundedCornerShape(16.dp))
+//                        .clickable {
+//                            val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+//                            try {
+//                                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+//                                    if (location != null) {
+//                                        val currentLatLng = LatLng(location.latitude, location.longitude)
+//                                        coroutineScope.launch {
+//                                            cameraPositionState.animate(
+//                                                com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f),
+//                                                1000
+//                                            )
+//                                        }
+//                                    }
+//                                }
+//                            } catch (e: SecurityException) {
+//                                e.printStackTrace()
+//                            }
+//                        },
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Icon(
+//                        painter = painterResource(id = R.drawable.ic_location_custom),
+//                        contentDescription = "My Location",
+//                        modifier = Modifier.size(24.dp),
+//                        tint = iconTint // Apply dynamic tinting
+//                    )
+//                }
+//            }
 
-                Box(
+            if (hasLocationPermission) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isSheetExpanded,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 220.dp) // Height above collapsed bottom sheet
-                        .size(56.dp) // Standard FAB size
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(glassColor)
-                        .border(1.dp, glassBorder, RoundedCornerShape(16.dp))
-                        .clickable {
-                            val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
-                            try {
-                                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                                    if (location != null) {
-                                        val currentLatLng = LatLng(location.latitude, location.longitude)
-                                        coroutineScope.launch {
-                                            cameraPositionState.animate(
-                                                com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f),
-                                                1000
-                                            )
-                                        }
-                                    }
-                                }
-                            } catch (e: SecurityException) {
-                                e.printStackTrace()
-                            }
-                        },
-                    contentAlignment = Alignment.Center
+                        // Float the capsule above the sheet synchronously.
+                        .padding(end = 16.dp, bottom = currentSheetHeightDp + 20.dp),
+                    enter = androidx.compose.animation.scaleIn(animationSpec = androidx.compose.animation.core.tween(800)) 
+                            + androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(800)),
+                    exit = androidx.compose.animation.scaleOut(animationSpec = androidx.compose.animation.core.tween(800))
+                            + androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(800))
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_location_custom),
-                        contentDescription = "My Location",
-                        modifier = Modifier.size(24.dp),
-                        tint = iconTint // Apply dynamic tinting
-                    )
+                    val glassColor = if (isDarkTheme) Color(0xFF1E1E1E).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.7f)
+                    val glassBorder = if (isDarkTheme) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.1f)
+                    val iconTint = if (isDarkTheme) Color.White else Color.Black
+
+                    Box(
+                        modifier = Modifier
+                            .height(120.dp) // tall pill
+                            .width(56.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(glassColor)
+                            .border(1.dp, glassBorder, RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // Top half: QR scanner
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        QrScanner.startScanning(
+                                            context = context,
+                                            onResult = { rawValue ->
+                                                android.widget.Toast.makeText(context, "QR: $rawValue", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_qr),
+                                    contentDescription = "QR Scanner",
+                                    modifier = Modifier.size(24.dp),
+                                    tint = iconTint
+                                )
+                            }
+
+                            // Divider inside the pill (horizontal)
+                            Box(
+                                modifier = Modifier
+                                    .height(1.dp)
+                                    .fillMaxWidth(0.6f)
+                                    .background(glassBorder)
+                            )
+
+                            // Bottom half: Location
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        val fusedLocationClient =
+                                            com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                                        try {
+                                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                                if (location != null) {
+                                                    val currentLatLng = LatLng(location.latitude, location.longitude)
+                                                    coroutineScope.launch {
+                                                        cameraPositionState.animate(
+                                                            com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f),
+                                                            1000
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        } catch (e: SecurityException) {
+                                            e.printStackTrace()
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_location_custom),
+                                    contentDescription = "My Location",
+                                    modifier = Modifier.size(24.dp),
+                                    tint = iconTint
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
+
             ThreeStateBottomSheet(
+                sheetHeightPx = sheetHeightPx,
+                expandedHeightPx = expandedHeightPx,
+                halfExpandedHeightPx = halfExpandedHeightPx,
+                collapsedHeightPx = collapsedHeightPx,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
@@ -324,21 +442,15 @@ fun MainScreen() {
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun ThreeStateBottomSheet(modifier: Modifier = Modifier) {
+fun ThreeStateBottomSheet(
+    sheetHeightPx: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    expandedHeightPx: Float,
+    halfExpandedHeightPx: Float,
+    collapsedHeightPx: Float,
+    modifier: Modifier = Modifier
+) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    
-    val screenHeightDp = configuration.screenHeightDp.dp
-    
-    val expandedHeight = screenHeightDp * 1.0f // Full screen
-    val halfExpandedHeight = screenHeightDp * 0.5f
-    val collapsedHeight = 200.dp
-    
-    val expandedHeightPx = with(density) { expandedHeight.toPx() }
-    val halfExpandedHeightPx = with(density) { halfExpandedHeight.toPx() }
-    val collapsedHeightPx = with(density) { collapsedHeight.toPx() }
-    
-    val sheetHeightPx = remember { Animatable(collapsedHeightPx) }
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableStateOf("Explore") }
     var activeExplorePost by remember { mutableStateOf<ExplorePost?>(null) }

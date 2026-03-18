@@ -364,7 +364,7 @@ fun RestaurantCard(
             )
             IconAction(painterResId = R.drawable.ic_share, contentDescription = "Share")
         }
-        Divider(
+        androidx.compose.material3.HorizontalDivider(
             color = Color.Gray,
             thickness = 0.5.dp,
             modifier = Modifier.padding(
@@ -544,7 +544,7 @@ fun RestaurantSkeletonCard(modifier: Modifier = Modifier) {
                 )
             }
         }
-        Divider(
+        androidx.compose.material3.HorizontalDivider(
             color = Color.Gray.copy(alpha = 0.3f),
             thickness = 0.5.dp,
             modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)

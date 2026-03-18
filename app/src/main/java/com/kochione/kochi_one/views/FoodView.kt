@@ -1,9 +1,11 @@
 package com.kochione.kochi_one.views
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,7 +48,20 @@ fun FoodView(viewModel: FoodViewModel = viewModel()) {
     val textColor = if (isDarkTheme) Color.White else Color.Black
 
     Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(bgColor),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp)
+        ) {
+            item {
+                Text(
+                    text = "Kochi Eats",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = textColor,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
             if (isLoading && restaurants.isEmpty()) {
                 items(3) { // Show 3 skeleton cards while initial data fetch happens
                     RestaurantSkeletonCard()

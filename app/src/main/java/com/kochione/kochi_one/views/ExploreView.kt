@@ -140,7 +140,7 @@ fun ExploreView(
                         ExploreSkeletonCard(isDarkTheme = isDarkTheme)
                         Spacer(modifier = Modifier.height(16.dp))
                     }
-                } else if (!isLoading && (errorMessage != null || posts.isEmpty())) {
+                } else if (!isLoading && errorMessage != null) {
                     item {
                         Column(
                             modifier = Modifier
@@ -177,6 +177,37 @@ fun ExploreView(
                                     Text("Refresh", fontWeight = FontWeight.SemiBold)
                                 }
                             }
+                        }
+                    }
+                } else if (!isLoading && posts.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp, horizontal = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Refresh, // Placeholder for empty
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = textColor.copy(alpha = 0.2f)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "No happenings right now.",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = textColor,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Check back later for new events!",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = subtleTextColor,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 } else {

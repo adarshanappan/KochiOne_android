@@ -42,9 +42,9 @@ class ExploreViewModel : ViewModel() {
             } catch (e: Exception) {
                 _errorMessage.value = "Network error: ${e.localizedMessage}"
             } finally {
-                // Ensure skeleton is visible for at least 10 seconds
+                // Ensure skeleton is visible for at least 1 second to avoid jarring flashes
                 val elapsedTime = System.currentTimeMillis() - startTime
-                val remainingTime = 10000 - elapsedTime
+                val remainingTime = 1000 - elapsedTime
                 if (remainingTime > 0) {
                     delay(remainingTime)
                 }
