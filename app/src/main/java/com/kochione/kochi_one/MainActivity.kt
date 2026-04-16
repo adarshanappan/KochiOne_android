@@ -13,12 +13,14 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -83,6 +86,8 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.kochione.kochi_one.models.ExplorePost
 import com.kochione.kochi_one.ui.theme.KochiOneTheme
+import com.kochione.kochi_one.viewmodels.PlayViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kochione.kochi_one.views.ExploreView
 import com.kochione.kochi_one.views.FitnessView
 import com.kochione.kochi_one.views.FoodView
@@ -109,7 +114,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen() {
     val haptic = LocalHapticFeedback.current
-    
+    // Create PlayViewModel as soon as the home screen loads so Play APIs run in the background
+    // before the user opens the Play tab (otherwise first open paid full network + TLS cold start).
+    val playViewModel = viewModel<PlayViewModel>()
+
     androidx.compose.runtime.LaunchedEffect(Unit) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
     }
@@ -130,6 +138,28 @@ fun MainScreen() {
     }
 
     var showLocationRationale by remember { mutableStateOf(false) }
+
+    val cameraPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            QrScanner.startScanning(
+                context = context,
+                onResult = { rawValue ->
+                    android.widget.Toast.makeText(context, "QR: $rawValue", android.widget.Toast.LENGTH_SHORT).show()
+                },
+                onFailure = {
+                    android.widget.Toast.makeText(context, "Unable to open scanner", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            )
+        } else {
+            android.widget.Toast.makeText(
+                context,
+                "Camera permission denied",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
@@ -365,19 +395,31 @@ fun MainScreen() {
                                     .weight(1f)
                                     .fillMaxWidth()
                                     .clickable {
-                                        QrScanner.startScanning(
-                                            context = context,
-                                            onResult = { rawValue ->
-                                                android.widget.Toast.makeText(context, "QR: $rawValue", android.widget.Toast.LENGTH_SHORT).show()
-                                            }
-                                        )
+                                        val hasCameraPermission =
+                                            androidx.core.content.ContextCompat.checkSelfPermission(
+                                                context,
+                                                android.Manifest.permission.CAMERA
+                                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                        if (hasCameraPermission) {
+                                            QrScanner.startScanning(
+                                                context = context,
+                                                onResult = { rawValue ->
+                                                    android.widget.Toast.makeText(context, "QR: $rawValue", android.widget.Toast.LENGTH_SHORT).show()
+                                                },
+                                                onFailure = {
+                                                    android.widget.Toast.makeText(context, "Unable to open scanner", android.widget.Toast.LENGTH_SHORT).show()
+                                                }
+                                            )
+                                        } else {
+                                            cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                        }
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_qr),
                                     contentDescription = "QR Scanner",
-                                    modifier = Modifier.size(24.dp),
+                                    modifier = Modifier.size(33.dp),
                                     tint = iconTint
                                 )
                             }
@@ -434,6 +476,7 @@ fun MainScreen() {
                 expandedHeightPx = expandedHeightPx,
                 halfExpandedHeightPx = halfExpandedHeightPx,
                 collapsedHeightPx = collapsedHeightPx,
+                playViewModel = playViewModel,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
@@ -447,6 +490,7 @@ fun ThreeStateBottomSheet(
     expandedHeightPx: Float,
     halfExpandedHeightPx: Float,
     collapsedHeightPx: Float,
+    playViewModel: PlayViewModel,
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -454,7 +498,9 @@ fun ThreeStateBottomSheet(
     val coroutineScope = rememberCoroutineScope()
     var selectedTab by remember { mutableStateOf("Explore") }
     var activeExplorePost by remember { mutableStateOf<ExplorePost?>(null) }
-    
+    var playOrFitnessDetailOpen by remember { mutableStateOf(false) }
+    var dismissPlayFitnessDetail by remember { mutableStateOf<(() -> Unit)?>(null) }
+
     val isDarkTheme = isSystemInDarkTheme()
     val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val textColor = if (isDarkTheme) Color.White else Color.Black
@@ -462,6 +508,7 @@ fun ThreeStateBottomSheet(
     val searchBarBgColor = if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF0F0F0)
     val dragHandleColor = if (isDarkTheme) Color.Gray else Color.LightGray
     val navBarIconTint = if (isDarkTheme) Color.White else Color.Black
+    val bottomNavReservedHeight = 72.dp
     
     // Calculate alpha for inner content based on sheet height
     // Fully visible (alpha 1f) at half expanded, fully hidden (alpha 0f) at collapsed
@@ -472,7 +519,12 @@ fun ThreeStateBottomSheet(
             progress.coerceIn(0f, 1f)
         }
     }
-    
+
+    androidx.compose.runtime.LaunchedEffect(selectedTab) {
+        playOrFitnessDetailOpen = false
+        dismissPlayFitnessDetail = null
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -563,10 +615,12 @@ fun ThreeStateBottomSheet(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    painter = painterResource(id = R.drawable.ic_back_outline),
+                                    painter = painterResource(id = R.drawable.ic_chevron_right),
                                     contentDescription = "Back",
                                     tint = textColor,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .scale(scaleX = -1f, scaleY = 1f)
                                 )
                             }
 
@@ -619,7 +673,7 @@ fun ThreeStateBottomSheet(
                             }
                         }
                     } else {
-                        // Standard Search Bar Row
+                        // Standard Search Bar Row — [Back?] [Capsule] [Profile]; detail mode only: back + wider capsule (10.dp inset/side)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -638,12 +692,37 @@ fun ThreeStateBottomSheet(
                                 }
                             }
 
+                            val detailBar = playOrFitnessDetailOpen
+                            // Same height for back circle and search capsule in detail bar (and normal search bar)
+                            val searchBarCapsuleHeight = 50.dp
+                            if (detailBar) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(searchBarCapsuleHeight)
+                                        .clip(CircleShape)
+                                        .background(searchBarBgColor)
+                                        .clickable { dismissPlayFitnessDetail?.invoke() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_chevron_left),
+                                        contentDescription = "Back",
+                                        tint = textColor,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+
+                            val searchCapsuleHorizontalPadding =
+                                if (detailBar) 8.dp else 0.dp
                             OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(50.dp)
+                                    .padding(horizontal = searchCapsuleHorizontalPadding)
+                                    .height(searchBarCapsuleHeight)
                                     .sharedBounds(
                                         rememberSharedContentState(key = "top_bar_search"),
                                         animatedVisibilityScope = this@AnimatedContent,
@@ -677,7 +756,7 @@ fun ThreeStateBottomSheet(
                                 singleLine = true
                             )
                             
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Spacer(modifier = Modifier.width(if (detailBar) 2.dp else 12.dp))
                             
                             // Profile Image
                             Box(
@@ -727,8 +806,15 @@ fun ThreeStateBottomSheet(
                             )
                         }
                         "Food" -> FoodView()
-                        "Play" -> PlayView()
-                        "Fitness" -> FitnessView()
+                        "Play" -> PlayView(
+                            viewModel = playViewModel,
+                            onDetailVisibilityChanged = { playOrFitnessDetailOpen = it },
+                            onRegisterDismissDetail = { dismissPlayFitnessDetail = it }
+                        )
+                        "Fitness" -> FitnessView(
+                            onDetailVisibilityChanged = { playOrFitnessDetailOpen = it },
+                            onRegisterDismissDetail = { dismissPlayFitnessDetail = it }
+                        )
                         "Transit" -> TransitView()
                         "Profile" -> ProfileView()
                     }
@@ -736,22 +822,27 @@ fun ThreeStateBottomSheet(
             }
             
             HorizontalDivider(color = dividerColor)
-            
-            // Nav Icons fixed at the bottom
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(bgColor)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .padding(bottom = 16.dp), // Extra padding for window bottom edge
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore") { selectedTab = "Explore" }
-                NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food") { selectedTab = "Food" }
-                NavItem(R.drawable.ic_play, "Play", selectedTab == "Play") { selectedTab = "Play" }
-                NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness") { selectedTab = "Fitness" }
-                NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit") { selectedTab = "Transit" }
+
+            // Keep a stable layout height to avoid "jump" when toggling details.
+            if (playOrFitnessDetailOpen) {
+                Spacer(modifier = Modifier.height(bottomNavReservedHeight))
+            } else {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(bgColor)
+                        .height(bottomNavReservedHeight)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(bottom = 16.dp), // Extra padding for window bottom edge
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore") { selectedTab = "Explore" }
+                    NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food") { selectedTab = "Food" }
+                    NavItem(R.drawable.ic_play, "Play", selectedTab == "Play") { selectedTab = "Play" }
+                    NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness") { selectedTab = "Fitness" }
+                    NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit") { selectedTab = "Transit" }
+                }
             }
         }
     }
@@ -766,7 +857,10 @@ fun NavItem(iconResId: Int, label: String, isSelected: Boolean, onClick: () -> U
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
+        modifier = Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null
+        ) { onClick() }
     ) {
         Icon(
             painter = painterResource(id = iconResId),

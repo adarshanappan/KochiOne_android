@@ -385,7 +385,10 @@ fun IconAction(painterResId: Int, contentDescription: String) {
         tint = tint,
         modifier = Modifier
             .size(48.dp)
-            .clickable { /* Action */ }
+            .clickable(
+                interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) { /* Action */ }
             .padding(12.dp)
     )
 }
