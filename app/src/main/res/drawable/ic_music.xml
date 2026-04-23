@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="34"
+    android:viewportHeight="32">
+    <!-- Converted from music.svg; group offsets SVG translate(-570,-622) + nudge for negative coords -->
+    <group
+        android:translateX="1.15"
+        android:translateY="0.25">
+        <path
+            android:fillColor="#FF000000"
+            android:pathData="M31,0C30.857,0.049,14,4,14,4C13.447,4.135,13,4.448,13,5L13,19.002C10.899,17.636,7.522,17.638,4.51,19.24C0.707,21.263,-1.04,25.031,0.606,27.659C2.253,30.286,6.67,30.776,10.472,28.754C12.923,27.45,14.615,24.981,15,23C15.067,22.865,15,5.765,15,5.765L30,2.235L30,15.002C27.899,13.636,24.522,13.638,21.51,15.24C17.707,17.263,15.96,21.031,17.606,23.659C19.253,26.286,23.67,26.776,27.472,24.754C29.923,23.45,31.615,20.981,32,19L32,1C32,0.447,31.553,-0.187,31,0Z" />
+    </group>
+</vector>

@@ -1,0 +1,132 @@
+{
+  "metro_system": "Kochi Metro",
+  "line": "Blue Line",
+  "status": "Operational",
+  "stations": [
+    {
+      "name": "Aluva",
+      "latitude": 10.1098,
+      "longitude": 76.3496
+    },
+    {
+      "name": "Pulinchodu",
+      "latitude": 10.0951,
+      "longitude": 76.3467
+    },
+    {
+      "name": "Companypady",
+      "latitude": 10.0873,
+      "longitude": 76.3428
+    },
+    {
+      "name": "Ambattukavu",
+      "latitude": 10.0794,
+      "longitude": 76.3390
+    },
+    {
+      "name": "Muttom",
+      "latitude": 10.0727,
+      "longitude": 76.3337
+    },
+    {
+      "name": "Kalamassery",
+      "latitude": 10.0584,
+      "longitude": 76.3219
+    },
+    {
+      "name": "CUSAT",
+      "latitude": 10.0469,
+      "longitude": 76.3184
+    },
+    {
+      "name": "Pathadipalam",
+      "latitude": 10.0359,
+      "longitude": 76.3144
+    },
+    {
+      "name": "Edapally",
+      "latitude": 10.0267,
+      "longitude": 76.3093
+    },
+    {
+      "name": "Changampuzha Park",
+      "latitude": 10.0152,
+      "longitude": 76.3023
+    },
+    {
+      "name": "Palarivattom",
+      "latitude": 10.0090,
+      "longitude": 76.3039
+    },
+    {
+      "name": "JLN Stadium",
+      "latitude": 10.0005,
+      "longitude": 76.2990
+    },
+    {
+      "name": "Kaloor",
+      "latitude": 9.9946,
+      "longitude": 76.2916
+    },
+    {
+      "name": "Town Hall",
+      "latitude": 9.9912,
+      "longitude": 76.2880
+    },
+    {
+      "name": "MG Road",
+      "latitude": 9.9841,
+      "longitude": 76.2765
+    },
+    {
+      "name": "Maharaja's College",
+      "latitude": 9.9734,
+      "longitude": 76.2850
+    },
+    {
+      "name": "Ernakulam South",
+      "latitude": 9.9678,
+      "longitude": 76.2913
+    },
+    {
+      "name": "Kadavanthra",
+      "latitude": 9.9666,
+      "longitude": 76.2983
+    },
+    {
+      "name": "Elamkulam",
+      "latitude": 9.9671,
+      "longitude": 76.3084
+    },
+    {
+      "name": "Vyttila",
+      "latitude": 9.9675,
+      "longitude": 76.3204
+    },
+    {
+      "name": "Thaikoodam",
+      "latitude": 9.9601,
+      "longitude": 76.3237
+    },
+    {
+      "name": "Pettah",
+      "latitude": 9.9512,
+      "longitude": 76.3310
+    },
+    {
+      "name": "Vadakkekotta",
+      "latitude": 9.9482,
+      "longitude": 76.3411
+    },
+    {
+      "name": "SN Junction",
+      "latitude": 9.9488,
+      "longitude": 76.3508
+    },
+    {
+      "name": "Thrippunithura",
+      "latitude": 9.9455,
+      "longitude": 76.3582
+    }
+  ]
+}
