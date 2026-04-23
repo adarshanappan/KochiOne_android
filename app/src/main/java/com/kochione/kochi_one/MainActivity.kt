@@ -1,8 +1,12 @@
 package com.kochione.kochi_one
 
 
-import android.app.Activity
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.Typeface
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
@@ -50,11 +54,11 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -63,22 +67,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Rect
-import android.graphics.Typeface
-import androidx.core.content.ContextCompat
-import com.google.android.gms.maps.model.BitmapDescriptor
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -92,6 +88,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.google.android.gms.common.api.ResolvableApiException
@@ -100,6 +97,8 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.LocationSettingsResponse
 import com.google.android.gms.location.Priority
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.tasks.Task
@@ -109,10 +108,10 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.kochione.kochi_one.models.ExplorePost
-import com.kochione.kochi_one.viewmodels.FoodViewModel
-import com.kochione.kochi_one.viewmodels.PlayViewModel
 import com.kochione.kochi_one.transit.Metro.data.KmrlOpenData
 import com.kochione.kochi_one.ui.theme.KochiOneTheme
+import com.kochione.kochi_one.viewmodels.FoodViewModel
+import com.kochione.kochi_one.viewmodels.PlayViewModel
 import com.kochione.kochi_one.views.ExploreView
 import com.kochione.kochi_one.views.FitnessView
 import com.kochione.kochi_one.views.FoodView
@@ -276,6 +275,9 @@ fun MainScreen() {
     val isZoomedOut by remember {
         derivedStateOf { cameraPositionState.position.zoom < 15.5f }
     }
+    val isVeryZoomedOut by remember {
+        derivedStateOf { cameraPositionState.position.zoom < 13.0f }
+    }
     
     val coroutineScope = rememberCoroutineScope()
 
@@ -387,12 +389,15 @@ fun MainScreen() {
                     val smallIcon = remember(context) {
                         bitmapDescriptorFromVector(context, R.drawable.ic_metro_stop_pin, 32)
                     }
+                    val verySmallIcon = remember(context) {
+                        bitmapDescriptorFromVector(context, R.drawable.ic_metro_stop_pin, 16)
+                    }
 
                     KmrlOpenData.stations.forEach { station ->
-                        val transitIcon = if (isZoomedOut) {
-                            smallIcon
-                        } else {
-                            remember(station.name, isDarkTheme) {
+                        val transitIcon = when {
+                            isVeryZoomedOut -> verySmallIcon
+                            isZoomedOut -> smallIcon
+                            else -> remember(station.name, isDarkTheme) {
                                 createMarkerWithLabel(context, R.drawable.ic_metro_stop_pin, station.name, isDarkTheme)
                             }
                         }
@@ -402,7 +407,11 @@ fun MainScreen() {
                             title = station.name,
                             snippet = "Metro Station",
                             icon = transitIcon,
-                            alpha = if (isZoomedOut) 0.7f else 0.9f
+                            alpha = when {
+                                isVeryZoomedOut -> 0.6f
+                                isZoomedOut -> 0.8f
+                                else -> 1.0f
+                            }
                         )
                     }
                 }
