@@ -3,6 +3,7 @@ package com.kochione.kochi_one.transit.Metro
 import com.google.android.gms.maps.model.LatLng
 import com.kochione.kochi_one.transit.Metro.data.KmrlOpenData
 import com.kochione.kochi_one.transit.Metro.data.ShapePoint
+import com.kochione.kochi_one.transit.Metro.data.TripInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -15,20 +16,39 @@ data class ActiveTrain(val tripId: String, val position: LatLng, val bearing: Fl
 
 object TrainSimulator {
     
+    private var lastUpdateTime = 0L
+    private val activeTripsCache = mutableListOf<TripInfo>()
+    private var lastCacheUpdate = 0L
+
     fun activeTrainsFlow(): Flow<List<ActiveTrain>> = flow {
         while (true) {
+            val now = System.currentTimeMillis()
             val cal = Calendar.getInstance()
             val currentSeconds = cal.get(Calendar.HOUR_OF_DAY) * 3600 + cal.get(Calendar.MINUTE) * 60 + cal.get(Calendar.SECOND)
+            val millisInSecond = now % 1000
+            val preciseSeconds = currentSeconds + (millisInSecond / 1000.0)
+
+            // Update active trips cache every 2 seconds
+            if (now - lastCacheUpdate > 2000) {
+                activeTripsCache.clear()
+                for (trip in KmrlOpenData.trips) {
+                    if (trip.stopTimes.isEmpty()) continue
+                    val firstArrival = trip.stopTimes.first().arrivalTime
+                    val lastArrival = trip.stopTimes.last().arrivalTime
+                    if (currentSeconds in (firstArrival - 30)..(lastArrival + 30)) {
+                        activeTripsCache.add(trip)
+                    }
+                }
+                lastCacheUpdate = now
+            }
             
             val activeTrains = mutableListOf<ActiveTrain>()
             
-            for (trip in KmrlOpenData.trips) {
-                if (trip.stopTimes.isEmpty()) continue
-                
+            for (trip in activeTripsCache) {
                 val firstArrival = trip.stopTimes.first().arrivalTime
                 val lastArrival = trip.stopTimes.last().arrivalTime
                 
-                if (currentSeconds in firstArrival..lastArrival) {
+                if (preciseSeconds in firstArrival.toDouble()..lastArrival.toDouble()) {
                     val shape = KmrlOpenData.shapePointsMap[trip.shapeId] ?: continue
                     
                     var currentDist = 0.0
@@ -36,14 +56,17 @@ object TrainSimulator {
                         val currentStop = trip.stopTimes[i]
                         val nextStop = trip.stopTimes[i + 1]
                         
-                        if (currentSeconds in currentStop.arrivalTime..nextStop.arrivalTime) {
-                            if (currentSeconds <= currentStop.departureTime) {
-                                // Dwelling at station
+                        if (preciseSeconds >= currentStop.arrivalTime && preciseSeconds <= nextStop.arrivalTime) {
+                            if (preciseSeconds <= currentStop.departureTime) {
                                 currentDist = currentStop.distTraveled
                             } else {
-                                // Moving between stations
-                                val progress = (currentSeconds - currentStop.departureTime).toDouble() / (nextStop.arrivalTime - currentStop.departureTime)
-                                currentDist = currentStop.distTraveled + (nextStop.distTraveled - currentStop.distTraveled) * progress
+                                val duration = nextStop.arrivalTime - currentStop.departureTime
+                                if (duration > 0) {
+                                    val progress = (preciseSeconds - currentStop.departureTime) / duration
+                                    currentDist = currentStop.distTraveled + (nextStop.distTraveled - currentStop.distTraveled) * progress
+                                } else {
+                                    currentDist = currentStop.distTraveled
+                                }
                             }
                             break
                         }
@@ -55,25 +78,83 @@ object TrainSimulator {
             }
             
             emit(activeTrains)
-            delay(200) // Update 5 times a second for smoother marker movement
+            delay(16) // 60 FPS for butter-smooth movement
         }
+    }
+
+    fun getCurrentTrainPosition(tripId: String): LatLng? {
+        val now = System.currentTimeMillis()
+        val cal = Calendar.getInstance()
+        val currentSeconds = cal.get(Calendar.HOUR_OF_DAY) * 3600 + cal.get(Calendar.MINUTE) * 60 + cal.get(Calendar.SECOND)
+        val millisInSecond = now % 1000
+        val preciseSeconds = currentSeconds + (millisInSecond / 1000.0)
+        
+        val trip = KmrlOpenData.trips.find { it.tripId == tripId } ?: return null
+        if (trip.stopTimes.isEmpty()) return null
+        
+        val firstArrival = trip.stopTimes.first().arrivalTime
+        val lastArrival = trip.stopTimes.last().arrivalTime
+        
+        if (preciseSeconds < firstArrival || preciseSeconds > lastArrival) return null
+        
+        val shape = KmrlOpenData.shapePointsMap[trip.shapeId] ?: return null
+        
+        var currentDist = 0.0
+        for (i in 0 until trip.stopTimes.size - 1) {
+            val currentStop = trip.stopTimes[i]
+            val nextStop = trip.stopTimes[i + 1]
+            
+            if (preciseSeconds >= currentStop.arrivalTime && preciseSeconds <= nextStop.arrivalTime) {
+                if (preciseSeconds <= currentStop.departureTime) {
+                    currentDist = currentStop.distTraveled
+                } else {
+                    val duration = nextStop.arrivalTime - currentStop.departureTime
+                    if (duration > 0) {
+                        val progress = (preciseSeconds - currentStop.departureTime) / duration
+                        currentDist = currentStop.distTraveled + (nextStop.distTraveled - currentStop.distTraveled) * progress
+                    } else {
+                        currentDist = currentStop.distTraveled
+                    }
+                }
+                break
+            }
+        }
+        
+        val (pos, _) = getLatLngAtDistance(shape, currentDist)
+        return pos
     }
 
     private fun getLatLngAtDistance(shape: List<ShapePoint>, dist: Double): Pair<LatLng, Float> {
         if (shape.isEmpty()) return LatLng(0.0, 0.0) to 0f
-        if (dist <= shape.first().dist) return shape.first().latLng to bearing(shape[0].latLng, shape.getOrNull(1)?.latLng ?: shape[0].latLng)
-        if (dist >= shape.last().dist) return shape.last().latLng to bearing(shape[shape.size-2].latLng, shape.last().latLng)
+        
+        val pos = getPosOnShape(shape, dist)
+        // Look 5 meters ahead for smooth bearing, but don't go past the end
+        val lookAheadDist = (dist + 0.005).coerceAtMost(shape.last().dist)
+        val aheadPos = getPosOnShape(shape, lookAheadDist)
+        
+        val bearing = if (pos == aheadPos) {
+            // If at the very end, use the last segment's bearing
+            if (shape.size >= 2) bearing(shape[shape.size - 2].latLng, shape.last().latLng) else 0f
+        } else {
+            bearing(pos, aheadPos)
+        }
+        
+        return pos to bearing
+    }
+
+    private fun getPosOnShape(shape: List<ShapePoint>, dist: Double): LatLng {
+        if (dist <= shape.first().dist) return shape.first().latLng
+        if (dist >= shape.last().dist) return shape.last().latLng
 
         for (i in 0 until shape.size - 1) {
             val p1 = shape[i]
             val p2 = shape[i + 1]
             if (dist >= p1.dist && dist <= p2.dist) {
                 val progress = if (p2.dist == p1.dist) 0.0 else (dist - p1.dist) / (p2.dist - p1.dist)
-                val interpolated = interpolateLatLng(p1.latLng, p2.latLng, progress)
-                return interpolated to bearing(p1.latLng, p2.latLng)
+                return interpolateLatLng(p1.latLng, p2.latLng, progress)
             }
         }
-        return shape.last().latLng to 0f
+        return shape.last().latLng
     }
 
     private fun interpolateLatLng(from: LatLng, to: LatLng, fraction: Double): LatLng {

@@ -211,7 +211,7 @@ fun FitnessView(
                     onVenueClick = { venue -> selectedVenue = venue }
                 )
             } else {
-                FitnessVenueEmptyFullScreenSheet(card = selectedCard!!)
+                FitnessVenueEmptyFullScreenSheet(card = selectedCard!!, isDarkTheme = isDarkTheme)
             }
         }
         selectedVenue?.let { venue ->
@@ -532,8 +532,10 @@ private fun FitnessHubActionRow() {
 }
 
 @Composable
-private fun FitnessVenueEmptyFullScreenSheet(card: FitnessCardData) {
-    val isDarkTheme = isSystemInDarkTheme()
+private fun FitnessVenueEmptyFullScreenSheet(
+    card: FitnessCardData,
+    isDarkTheme: Boolean
+) {
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val titleColor = if (isDarkTheme) Color.White.copy(alpha = 0.92f) else Color(0xFF1A1A1A)
     val subtitleColor = if (isDarkTheme) Color.White.copy(alpha = 0.58f) else Color(0xFF666666)
@@ -553,7 +555,7 @@ private fun FitnessVenueEmptyFullScreenSheet(card: FitnessCardData) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_fitness),
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.92f),
+                tint = titleColor,
                 modifier = Modifier.size(58.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -578,7 +580,6 @@ private fun FitnessVenueFullScreenSheet(
     onVenueClick: (FitnessVenue) -> Unit
 ) {
     val context = LocalContext.current
-    val isDarkTheme = isSystemInDarkTheme()
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val primaryText = if (isDarkTheme) Color.White else Color(0xFF121212)
     val secondaryText = if (isDarkTheme) Color.White.copy(alpha = 0.62f) else Color(0xFF616161)

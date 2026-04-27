@@ -254,7 +254,7 @@ fun PlayView(
                         onVenueClick = { venue -> selectedVenue = venue }
                     )
                 } else {
-                    PlayVenueEmptyFullScreenSheet(card = card)
+                    PlayVenueEmptyFullScreenSheet(card = card, isDarkTheme = isDarkTheme)
                 }
             } else {
                 Spacer(modifier = Modifier.size(0.dp))
@@ -327,9 +327,9 @@ private fun PlayViewCardsSkeleton(isDarkTheme: Boolean) {
 
 @Composable
 private fun PlayVenueEmptyFullScreenSheet(
-    card: PlayCardData
+    card: PlayCardData,
+    isDarkTheme: Boolean
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val titleColor = if (isDarkTheme) Color.White.copy(alpha = 0.92f) else Color(0xFF1A1A1A)
     val subtitleColor = if (isDarkTheme) Color.White.copy(alpha = 0.58f) else Color(0xFF666666)
@@ -352,7 +352,7 @@ private fun PlayVenueEmptyFullScreenSheet(
                     Icon(
                         painter = painterResource(id = R.drawable.ic_no_venues_field),
                         contentDescription = null,
-                        tint = Color.Unspecified,
+                        tint = titleColor,
                         modifier = Modifier.size(58.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -443,7 +443,6 @@ private fun PlayVenueFullScreenSheet(
     onVenueClick: (PlayVenue) -> Unit
 ) {
     val context = LocalContext.current
-    val isDarkTheme = isSystemInDarkTheme()
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val primaryText = if (isDarkTheme) Color.White else Color(0xFF121212)
     val secondaryText = if (isDarkTheme) Color.White.copy(alpha = 0.62f) else Color(0xFF616161)
@@ -670,7 +669,7 @@ private fun PlayVenueFullScreenSheet(
                                 onClick = { shareVenue(context, venue) }
                             )
                         }
-
+ 
                         Spacer(modifier = Modifier.height(14.dp))
                         HorizontalDivider(color = dividerColor)
                     }

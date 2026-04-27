@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">KochiOne</string>
     <string name="location_rationale_description">KochiOne uses your location to show nearby cafes, restaurants and places around you.</string>
+    <string name="camera_rationale_description">We need access to your camera to scan QR codes.</string>
 </resources>

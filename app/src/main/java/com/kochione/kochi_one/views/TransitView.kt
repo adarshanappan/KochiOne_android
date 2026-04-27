@@ -9,6 +9,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +53,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
+import android.view.HapticFeedbackConstants
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,6 +64,10 @@ import com.kochione.kochi_one.R
 import com.kochione.kochi_one.transit.Metro.MetroStation
 import com.kochione.kochi_one.transit.Metro.data.KmrlOpenData
 import com.kochione.kochi_one.transit.Metro.data.TrainScheduleEntry
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.collectAsState
+import com.kochione.kochi_one.viewmodels.TransitViewModel
+
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import kotlin.math.abs
@@ -88,9 +98,9 @@ private fun nowSeconds(): Int {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TransitView(isDark: Boolean) {
-    val bgColor     = if (isDark) Color(0xFF1A1A1A) else Color(0xFFF5F5F5)
-    val cardBg      = if (isDark) Color(0xFF272727) else Color(0xFFFFFFFF)
+fun TransitView(isDark: Boolean, transitViewModel: TransitViewModel = viewModel()) {
+    val bgColor     = if (isDark) Color(0xFF1A1A1A) else Color.White
+    val cardBg      = if (isDark) Color(0xFF272727) else Color(0xFFF5F5F5)
     val textColor   = if (isDark) Color.White else Color(0xFF1A1A1A)
     val dimColor    = textColor.copy(alpha = 0.4f)
     val highlightBg = if (isDark) Color(0xFF363636) else Color(0xFFE8E8E8)
@@ -100,16 +110,17 @@ fun TransitView(isDark: Boolean) {
     val haptic   = LocalHapticFeedback.current
     val stations = KmrlOpenData.stations
 
+    val fromStation by transitViewModel.fromStation.collectAsState()
+    val toStation by transitViewModel.toStation.collectAsState()
+
     var fromExpanded    by remember { mutableStateOf(false) }
     var toExpanded      by remember { mutableStateOf(false) }
-    var fromStation     by remember { mutableStateOf<MetroStation?>(null) }
-    var toStation       by remember { mutableStateOf<MetroStation?>(null) }
     var expandedTripId  by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(stations.size) {
         if (stations.isNotEmpty() && fromStation == null) {
-            fromStation = stations.first()
-            toStation   = stations.first()
+            transitViewModel.setFromStation(stations.first())
+            transitViewModel.setToStation(stations.first())
         }
     }
 
@@ -228,7 +239,9 @@ fun TransitView(isDark: Boolean) {
                     .background(if (isDark) Color(0xFF404040) else Color(0xFFEAEAEA))
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        val tmp = fromStation; fromStation = toStation; toStation = tmp
+                        val tmp = fromStation
+                        transitViewModel.setFromStation(toStation)
+                        transitViewModel.setToStation(tmp)
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -252,7 +265,7 @@ fun TransitView(isDark: Boolean) {
                 textColor   = textColor,
                 dimColor    = dimColor,
                 highlightBg = highlightBg,
-                onSelect    = { fromStation = it }
+                onSelect    = { transitViewModel.setFromStation(it) }
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -266,7 +279,7 @@ fun TransitView(isDark: Boolean) {
                 textColor   = textColor,
                 dimColor    = dimColor,
                 highlightBg = highlightBg,
-                onSelect    = { toStation = it }
+                onSelect    = { transitViewModel.setToStation(it) }
             )
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -431,12 +444,49 @@ private fun StationWheelPicker(
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
     val coroutineScope = rememberCoroutineScope()
 
-    val centerPaddedIdx by remember { derivedStateOf { listState.firstVisibleItemIndex + padding } }
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    val centerPaddedIdx by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2
+            layoutInfo.visibleItemsInfo.minByOrNull { kotlin.math.abs((it.offset + it.size / 2) - viewportCenter) }?.index 
+                ?: (listState.firstVisibleItemIndex + padding)
+        }
+    }
 
+    // 1. Immediate tactile feedback (the "tick")
     LaunchedEffect(listState) {
         snapshotFlow { centerPaddedIdx }.collect { idx ->
             val stIdx = idx - padding
-            if (stIdx in stations.indices) onSelect(stations[stIdx])
+            if (stIdx in stations.indices) {
+                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            }
+        }
+    }
+
+    // 2. Debounced state update: Only update the ViewModel when the scroll settles.
+    // This prevents expensive global recompositions (Map, Schedule) during the drag.
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) {
+            val stIdx = centerPaddedIdx - padding
+            if (stIdx in stations.indices) {
+                onSelect(stations[stIdx])
+            }
+        }
+    }
+
+    // 3. Nested Scroll Trap: Prevent parent (BottomSheet) from moving when interacting with the picker.
+    val pickerNestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // Return Offset.Zero to allow the child (LazyColumn) to receive the scroll first
+                return Offset.Zero
+            }
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                // Consume all leftover scroll to keep the BottomSheet stable
+                return available
+            }
         }
     }
 
@@ -470,7 +520,10 @@ private fun StationWheelPicker(
         LazyColumn(
             state         = listState,
             flingBehavior = flingBehavior,
-            modifier      = Modifier.fillMaxWidth().height(itemHeightDp * visibleItems)
+            modifier      = Modifier
+                .fillMaxWidth()
+                .height(itemHeightDp * visibleItems)
+                .nestedScroll(pickerNestedScrollConnection)
         ) {
             itemsIndexed(padded) { index, station ->
                 val dist     = abs(index - centerPaddedIdx)
@@ -480,6 +533,7 @@ private fun StationWheelPicker(
                     modifier = Modifier
                         .fillMaxWidth().height(itemHeightDp)
                         .then(if (station != null) Modifier.clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             coroutineScope.launch { listState.animateScrollToItem(index - padding) }
                         } else Modifier),
                     contentAlignment = Alignment.Center
@@ -600,7 +654,7 @@ private fun FareResultCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(Color.White)
+                .background(cardBg)
                 .clickable {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     val uri = Uri.parse("https://api.whatsapp.com/send?phone=919188957488")
@@ -613,13 +667,13 @@ private fun FareResultCard(
                 Icon(
                     painter            = painterResource(R.drawable.ic_chat_bubble),
                     contentDescription = null,
-                    tint               = Color(0xFF1A2744),
+                    tint               = textColor,
                     modifier           = Modifier.size(22.dp)
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
                     text       = "Book Ticket in WhatsApp",
-                    color      = Color(0xFF1A1A1A),
+                    color      = textColor,
                     fontWeight = FontWeight.Bold,
                     fontSize   = 16.sp
                 )

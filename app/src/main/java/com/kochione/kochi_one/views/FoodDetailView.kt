@@ -277,31 +277,32 @@ fun FoodDetailView(
                 .fillMaxSize()
                 .background(pageBg)
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 100.dp) // Space for fixed bottom bar
+                .padding(bottom = 100.dp)
         ) {
-            FoodDetailTopSection(restaurant = restaurant)
-            FoodDetailStatsRow(restaurant = restaurant)
+            FoodDetailTopSection(restaurant = restaurant, isDarkTheme = isDarkTheme)
+            FoodDetailStatsRow(restaurant = restaurant, isDarkTheme = isDarkTheme)
             if (images.isNotEmpty()) {
                 FoodDetailGallerySection(
                     images = images,
                     selectedIndex = selectedIndex,
+                    isDarkTheme = isDarkTheme,
                     onSelectedIndexChange = { selectedIndex = it },
                     onRequestFullGallery = { openFullGallery(selectedIndex) }
                 )
             }
-            FoodDetailInfoSection(restaurant = restaurant)
+            FoodDetailInfoSection(restaurant = restaurant, isDarkTheme = isDarkTheme)
         }
 
         FoodDetailActionBar(
             restaurant = restaurant,
+            isDarkTheme = isDarkTheme,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
 }
 
 @Composable
-private fun FoodDetailSheetTop() {
-    val isDarkTheme = isSystemInDarkTheme()
+private fun FoodDetailSheetTop(isDarkTheme: Boolean, onClose: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -322,6 +323,7 @@ private fun FoodDetailSheetTop() {
 @Composable
 fun FoodDetailTopSection(
     restaurant: Restaurant,
+    isDarkTheme: Boolean,
     modifier: Modifier = Modifier
 ) {
     val todayHours = getTodayHours(restaurant)
@@ -417,6 +419,7 @@ fun FoodDetailTopSection(
 private fun FoodDetailGallerySection(
     images: List<String>,
     selectedIndex: Int,
+    isDarkTheme: Boolean,
     onSelectedIndexChange: (Int) -> Unit,
     onRequestFullGallery: () -> Unit
 ) {
@@ -733,7 +736,7 @@ private fun FoodDetailStatsRow(restaurant: Restaurant) {
 }
 
 @Composable
-private fun FoodDetailInfoSection(restaurant: Restaurant) {
+private fun FoodDetailInfoSection(restaurant: Restaurant, isDarkTheme: Boolean) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
     val cardBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFFFFFFF)
@@ -774,29 +777,29 @@ private fun FoodDetailInfoSection(restaurant: Restaurant) {
         Spacer(modifier = Modifier.height(10.dp))
         val features = restaurant.features.ifEmpty { listOf("No features available") }
         features.forEachIndexed { index, feature ->
-            FeatureRow(feature)
-            if (index != features.lastIndex) HorizontalLine()
+            FeatureRow(feature, isDarkTheme)
+            if (index != features.lastIndex) HorizontalLine(isDarkTheme)
         }
 
         Spacer(modifier = Modifier.height(22.dp))
-        SectionTitle("Hours")
+        SectionTitle("Hours", isDarkTheme)
         Spacer(modifier = Modifier.height(10.dp))
         HoursHeader(restaurant)
-        HorizontalLine()
+        HorizontalLine(isDarkTheme)
         Spacer(modifier = Modifier.height(8.dp))
 
-        DayHoursRow("Monday", restaurant.operatingHours.monday)
-        DayHoursRow("Tuesday", restaurant.operatingHours.tuesday)
-        DayHoursRow("Wednesday", restaurant.operatingHours.wednesday)
-        DayHoursRow("Thursday", restaurant.operatingHours.thursday)
-        DayHoursRow("Friday", restaurant.operatingHours.friday)
-        DayHoursRow("Saturday", restaurant.operatingHours.saturday)
-        DayHoursRow("Sunday", restaurant.operatingHours.sunday)
+        DayHoursRow("Monday", restaurant.operatingHours.monday, isDarkTheme)
+        DayHoursRow("Tuesday", restaurant.operatingHours.tuesday, isDarkTheme)
+        DayHoursRow("Wednesday", restaurant.operatingHours.wednesday, isDarkTheme)
+        DayHoursRow("Thursday", restaurant.operatingHours.thursday, isDarkTheme)
+        DayHoursRow("Friday", restaurant.operatingHours.friday, isDarkTheme)
+        DayHoursRow("Saturday", restaurant.operatingHours.saturday, isDarkTheme)
+        DayHoursRow("Sunday", restaurant.operatingHours.sunday, isDarkTheme)
 
         Spacer(modifier = Modifier.height(18.dp))
-        HorizontalLine()
+        HorizontalLine(isDarkTheme)
         Spacer(modifier = Modifier.height(14.dp))
-        SectionTitle("Contact")
+        SectionTitle("Contact", isDarkTheme)
         Spacer(modifier = Modifier.height(12.dp))
 
         val contactIconTint = if (isDarkTheme) Color(0xFFA7ADB7) else Color(0xFF6B7280)
@@ -833,7 +836,7 @@ private fun FoodDetailInfoSection(restaurant: Restaurant) {
             )
         }
         Spacer(modifier = Modifier.height(14.dp))
-        HorizontalLine()
+        HorizontalLine(isDarkTheme)
         Spacer(modifier = Modifier.height(14.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -959,8 +962,7 @@ private fun FoodDetailInfoSection(restaurant: Restaurant) {
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    val isDarkTheme = isSystemInDarkTheme()
+private fun SectionTitle(text: String, isDarkTheme: Boolean) {
     Text(
         text = text,
         color = if (isDarkTheme) Color.White else Color(0xFF111418),
@@ -970,8 +972,7 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun FeatureRow(feature: String) {
-    val isDarkTheme = isSystemInDarkTheme()
+private fun FeatureRow(feature: String, isDarkTheme: Boolean) {
     val iconTint = if (isDarkTheme) Color(0xFFA7ADB7) else Color(0xFF4A4F57)
     val textColor = if (isDarkTheme) Color.White else Color(0xFF111418)
     Row(
@@ -1012,8 +1013,7 @@ private fun featureIconRes(feature: String): Int {
 }
 
 @Composable
-private fun HorizontalLine() {
-    val isDarkTheme = isSystemInDarkTheme()
+private fun HorizontalLine(isDarkTheme: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1053,8 +1053,7 @@ private fun HoursHeader(restaurant: Restaurant) {
 }
 
 @Composable
-private fun DayHoursRow(day: String, dayHours: DayHours) {
-    val isDarkTheme = isSystemInDarkTheme()
+private fun DayHoursRow(day: String, dayHours: DayHours, isDarkTheme: Boolean) {
     val textColor = if (isDarkTheme) Color.White else Color(0xFF111418)
     Row(
         modifier = Modifier
@@ -1156,10 +1155,10 @@ private fun openEmailComposer(context: Context, to: String, restaurantName: Stri
 @Composable
 fun FoodDetailActionBar(
     restaurant: Restaurant,
+    isDarkTheme: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val isDarkTheme = isSystemInDarkTheme()
     var isLiked by remember { mutableStateOf(false) }
     var isSaved by remember { mutableStateOf(false) }
 
