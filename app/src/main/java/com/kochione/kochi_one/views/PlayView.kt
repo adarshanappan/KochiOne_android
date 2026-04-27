@@ -269,9 +269,9 @@ fun PlayView(
             if (card != null) {
                 val detailVenues = buildDetailVenuesForCard(card, venues)
                 if (detailVenues.isNotEmpty()) {
-                    PlayVenueFullScreenSheet(venues = detailVenues)
+                    PlayVenueFullScreenSheet(venues = detailVenues, isDarkTheme = isDarkTheme)
                 } else {
-                    PlayVenueEmptyFullScreenSheet(card = card)
+                    PlayVenueEmptyFullScreenSheet(card = card, isDarkTheme = isDarkTheme)
                 }
             } else {
                 Spacer(modifier = Modifier.size(0.dp))
@@ -327,9 +327,9 @@ private fun PlayViewCardsSkeleton(isDarkTheme: Boolean) {
 
 @Composable
 private fun PlayVenueEmptyFullScreenSheet(
-    card: PlayCardData
+    card: PlayCardData,
+    isDarkTheme: Boolean
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val titleColor = if (isDarkTheme) Color.White.copy(alpha = 0.92f) else Color(0xFF1A1A1A)
     val subtitleColor = if (isDarkTheme) Color.White.copy(alpha = 0.58f) else Color(0xFF666666)
@@ -352,7 +352,7 @@ private fun PlayVenueEmptyFullScreenSheet(
                     Icon(
                         painter = painterResource(id = R.drawable.ic_no_venues_field),
                         contentDescription = null,
-                        tint = Color.Unspecified,
+                        tint = titleColor,
                         modifier = Modifier.size(58.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -430,11 +430,13 @@ private fun PlayFeatureCard(
 
 @Composable
 private fun PlayVenueFullScreenSheet(
-    venues: List<PlayVenue>
+    venues: List<PlayVenue>,
+    isDarkTheme: Boolean
 ) {
     val context = LocalContext.current
-    val isDarkTheme = isSystemInDarkTheme()
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
+    val textColor = if (isDarkTheme) Color.White else Color.Black
+    val secondaryTextColor = textColor.copy(alpha = 0.62f)
     val likedMap = remember { mutableStateMapOf<String, Boolean>() }
     val savedMap = remember { mutableStateMapOf<String, Boolean>() }
 
@@ -493,7 +495,7 @@ private fun PlayVenueFullScreenSheet(
                                         Icon(
                                             painter = painterResource(id = R.drawable.ic_play),
                                             contentDescription = null,
-                                            tint = Color.White.copy(alpha = 0.9f),
+                                            tint = textColor.copy(alpha = 0.9f),
                     modifier = Modifier
                                                 .padding(10.dp)
                         .fillMaxSize()
@@ -503,7 +505,7 @@ private fun PlayVenueFullScreenSheet(
                                 Column {
                                     Text(
                                         text = venue.name,
-                                        color = Color.White,
+                                        color = textColor,
                                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -523,7 +525,7 @@ private fun PlayVenueFullScreenSheet(
                                         )
                                         Text(
                                             text = " \u00b7 $statusSuffix",
-                                            color = Color.White.copy(alpha = 0.62f),
+                                            color = secondaryTextColor,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     }
@@ -535,7 +537,7 @@ private fun PlayVenueFullScreenSheet(
                             ) {
                                 Text(
                                     text = "${"%.1f".format(venue.rating)} km",
-                                    color = Color.White.copy(alpha = 0.7f),
+                                    color = textColor.copy(alpha = 0.7f),
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                                 Icon(
@@ -551,7 +553,7 @@ private fun PlayVenueFullScreenSheet(
 
                         Text(
                             text = venue.description.ifBlank { "No description available." },
-                            color = Color.White.copy(alpha = 0.72f),
+                            color = textColor.copy(alpha = 0.72f),
                             style = MaterialTheme.typography.bodyLarge
                         )
 
@@ -613,33 +615,37 @@ private fun PlayVenueFullScreenSheet(
                         ) {
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_call,
+                                tint = textColor.copy(alpha = 0.76f),
                                 onClick = { callVenue(context, venue.contact.phone) }
                             )
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_near_me,
+                                tint = textColor.copy(alpha = 0.76f),
                                 onClick = { openVenueMap(context, venue.location.latitude, venue.location.longitude, venue.name) }
                             )
                             SheetActionIcon(
                                 iconRes = if (liked) R.drawable.ic_heart_filled else R.drawable.ic_heart,
-                                tint = if (liked) Color(0xFFFF3B30) else Color.White.copy(alpha = 0.76f),
+                                tint = if (liked) Color(0xFFFF3B30) else textColor.copy(alpha = 0.76f),
                                 isActive = liked,
                                 animateOnActivate = true,
                                 onClick = { likedMap[venue.id] = !liked }
                             )
                             SheetActionIcon(
                                 iconRes = if (saved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+                                tint = textColor.copy(alpha = 0.76f),
                                 isActive = saved,
                                 animateOnActivate = true,
                                 onClick = { savedMap[venue.id] = !saved }
                             )
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_share,
+                                tint = textColor.copy(alpha = 0.76f),
                                 onClick = { shareVenue(context, venue) }
                             )
                         }
-
+ 
                         Spacer(modifier = Modifier.height(14.dp))
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        HorizontalDivider(color = textColor.copy(alpha = 0.08f))
                     }
                 }
                 item { Spacer(modifier = Modifier.height(20.dp)) }

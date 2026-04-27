@@ -73,7 +73,7 @@ fun RestaurantCard(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(Color.White),
+                    .background(if (isDarkTheme) Color(0xFF333333) else Color.White),
                 contentScale = ContentScale.Crop
             )
 
@@ -382,7 +382,7 @@ fun RestaurantCard(
             IconAction(painterResId = R.drawable.ic_share, contentDescription = "Share", isDarkTheme = isDarkTheme)
         }
         androidx.compose.material3.HorizontalDivider(
-            color = Color.Gray,
+            color = (if (isDarkTheme) Color.White else Color.Black).copy(alpha = 0.12f),
             thickness = 0.5.dp,
             modifier = Modifier.padding(
                 top = 12.dp,

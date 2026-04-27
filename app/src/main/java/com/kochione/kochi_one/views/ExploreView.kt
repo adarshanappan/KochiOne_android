@@ -216,6 +216,7 @@ fun ExploreView(
                     items(posts) { post ->
                         ExploreSummaryCard(
                             post = post,
+                            isDarkTheme = isDarkTheme,
                             cardBgColor = cardBgColor,
                             textColor = textColor,
                             subtleTextColor = subtleTextColor,
@@ -232,6 +233,7 @@ fun ExploreView(
 @Composable
 fun ExploreSummaryCard(
     post: ExplorePost, 
+    isDarkTheme: Boolean,
     cardBgColor: Color, 
     textColor: Color, 
     subtleTextColor: Color, 
@@ -342,13 +344,13 @@ fun ExploreSummaryCard(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF333333)), // Arrow background color
+                        .background(if (isDarkTheme) Color(0xFF333333) else Color(0xFFF0F0F0)), 
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = post.buttonLabel,
-                        tint = Color.White,
+                        tint = textColor,
                         modifier = Modifier.size(16.dp)
                     )
                 }

@@ -91,7 +91,7 @@ fun FitnessView(
     val venues by viewModel.venues.collectAsState()
     val categoryThumbnails by viewModel.categoryThumbnails.collectAsState()
     // Theme handled by parameter
-    val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFF5F5F5)
+    val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     var selectedCard by remember { mutableStateOf<FitnessCardData?>(null) }
 
     androidx.compose.runtime.LaunchedEffect(selectedCard) {
@@ -178,9 +178,9 @@ fun FitnessView(
         if (selectedCard != null) {
             val detailVenues = buildFitnessDetailVenuesForCard(selectedCard!!, venues)
             if (detailVenues.isNotEmpty()) {
-                FitnessVenueFullScreenSheet(venues = detailVenues)
+                FitnessVenueFullScreenSheet(venues = detailVenues, isDarkTheme = isDarkTheme)
             } else {
-                FitnessVenueEmptyFullScreenSheet(card = selectedCard!!)
+                FitnessVenueEmptyFullScreenSheet(card = selectedCard!!, isDarkTheme = isDarkTheme)
             }
         }
     }
@@ -431,8 +431,10 @@ private fun FitnessHubActionRow() {
 }
 
 @Composable
-private fun FitnessVenueEmptyFullScreenSheet(card: FitnessCardData) {
-    val isDarkTheme = isSystemInDarkTheme()
+private fun FitnessVenueEmptyFullScreenSheet(
+    card: FitnessCardData,
+    isDarkTheme: Boolean
+) {
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val titleColor = if (isDarkTheme) Color.White.copy(alpha = 0.92f) else Color(0xFF1A1A1A)
     val subtitleColor = if (isDarkTheme) Color.White.copy(alpha = 0.58f) else Color(0xFF666666)
@@ -452,7 +454,7 @@ private fun FitnessVenueEmptyFullScreenSheet(card: FitnessCardData) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_fitness),
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.92f),
+                tint = titleColor,
                 modifier = Modifier.size(58.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -473,11 +475,13 @@ private fun FitnessVenueEmptyFullScreenSheet(card: FitnessCardData) {
 
 @Composable
 private fun FitnessVenueFullScreenSheet(
-    venues: List<FitnessVenue>
+    venues: List<FitnessVenue>,
+    isDarkTheme: Boolean
 ) {
     val context = LocalContext.current
-    val isDarkTheme = isSystemInDarkTheme()
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
+    val textColor = if (isDarkTheme) Color.White else Color.Black
+    val secondaryTextColor = textColor.copy(alpha = 0.62f)
     val likedMap = remember { mutableStateMapOf<String, Boolean>() }
     val savedMap = remember { mutableStateMapOf<String, Boolean>() }
 
@@ -536,7 +540,7 @@ private fun FitnessVenueFullScreenSheet(
                                         Icon(
                                             painter = painterResource(id = R.drawable.ic_fitness),
                                             contentDescription = null,
-                                            tint = Color.White.copy(alpha = 0.9f),
+                                            tint = textColor.copy(alpha = 0.9f),
                                             modifier = Modifier
                                                 .padding(10.dp)
                                                 .fillMaxSize()
@@ -546,7 +550,7 @@ private fun FitnessVenueFullScreenSheet(
                                 Column {
                                     Text(
                                         text = venue.name,
-                                        color = Color.White,
+                                        color = textColor,
                                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -566,7 +570,7 @@ private fun FitnessVenueFullScreenSheet(
                                         )
                                         Text(
                                             text = " \u00b7 $statusSuffix",
-                                            color = Color.White.copy(alpha = 0.62f),
+                                            color = secondaryTextColor,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     }
@@ -578,7 +582,7 @@ private fun FitnessVenueFullScreenSheet(
                             ) {
                                 Text(
                                     text = "${"%.1f".format(venue.rating)} km",
-                                    color = Color.White.copy(alpha = 0.7f),
+                                    color = textColor.copy(alpha = 0.7f),
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                                 Icon(
@@ -593,7 +597,7 @@ private fun FitnessVenueFullScreenSheet(
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = venue.description.ifBlank { "No description available." },
-                            color = Color.White.copy(alpha = 0.72f),
+                            color = textColor.copy(alpha = 0.72f),
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis
@@ -654,32 +658,36 @@ private fun FitnessVenueFullScreenSheet(
                         ) {
                             FitnessSheetActionIcon(
                                 iconRes = R.drawable.ic_call,
+                                tint = textColor.copy(alpha = 0.76f),
                                 onClick = { callFitnessVenue(context, venue.contact.phone) }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = R.drawable.ic_near_me,
+                                tint = textColor.copy(alpha = 0.76f),
                                 onClick = { openFitnessVenueMap(context, venue.location.latitude, venue.location.longitude, venue.name) }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = if (liked) R.drawable.ic_heart_filled else R.drawable.ic_heart,
-                                tint = if (liked) Color(0xFFFF3B30) else Color.White.copy(alpha = 0.76f),
+                                tint = if (liked) Color(0xFFFF3B30) else textColor.copy(alpha = 0.76f),
                                 isActive = liked,
                                 animateOnActivate = true,
                                 onClick = { likedMap[venue.id] = !liked }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = if (saved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+                                tint = textColor.copy(alpha = 0.76f),
                                 isActive = saved,
                                 animateOnActivate = true,
                                 onClick = { savedMap[venue.id] = !saved }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = R.drawable.ic_share,
+                                tint = textColor.copy(alpha = 0.76f),
                                 onClick = { shareFitnessVenue(context, venue) }
                             )
                         }
                         Spacer(modifier = Modifier.height(14.dp))
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        HorizontalDivider(color = textColor.copy(alpha = 0.08f))
                     }
                 }
                 item { Spacer(modifier = Modifier.height(20.dp)) }

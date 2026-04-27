@@ -25,6 +25,7 @@ object KmrlOpenData {
     val routePoints = androidx.compose.runtime.mutableStateListOf<LatLng>()
     val routePoints2 = androidx.compose.runtime.mutableStateListOf<LatLng>()
     val metroLinePoints = androidx.compose.runtime.mutableStateListOf<LatLng>()
+    val pinkRoutePoints = androidx.compose.runtime.mutableStateListOf<LatLng>()
 
     var trips = emptyList<TripInfo>()
     val shapePointsMap = mutableMapOf<String, List<ShapePoint>>()
@@ -46,6 +47,7 @@ object KmrlOpenData {
             loadFareAttributes(context)
             loadFareRules(context)
             loadRouteJson(context)
+            loadPinkRouteJson(context)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -98,10 +100,15 @@ object KmrlOpenData {
             shapePointsMap.clear()
             shapePointsMap.putAll(shapes)
             routePoints.clear()
-            // Flat map all shapes since we just need to plot every path
             routePoints.addAll(shapes["R1_0"]?.map { it.latLng } ?: emptyList())
             routePoints2.clear()
             routePoints2.addAll(shapes["R1_1"]?.map { it.latLng } ?: emptyList())
+            
+            // Unify all shape points into metroLinePoints so trains always follow the visible line
+            metroLinePoints.clear()
+            metroLinePoints.addAll(routePoints)
+            // We don't add routePoints2 here yet because they might overlap or be separate lines.
+            // But for Kochi Metro it's a single line with two directions.
         }
     }
 
@@ -192,7 +199,40 @@ object KmrlOpenData {
         }
     }
 
+    private suspend fun loadPinkRouteJson(context: Context) {
+        val points = mutableListOf<LatLng>()
+        withContext(Dispatchers.IO) {
+            try {
+                context.assets.open("metro_data/route_pink.json").use { inputStream ->
+                    val json = inputStream.bufferedReader().use { it.readText() }
+                    val gson = Gson()
+                    val root = gson.fromJson(json, Map::class.java)
+                    val features = root["features"] as? List<*>
+                    val feature = features?.getOrNull(0) as? Map<*, *>
+                    val geometry = feature?.get("geometry") as? Map<*, *>
+                    val coordinates = geometry?.get("coordinates") as? List<*>
+                    
+                    coordinates?.forEach { coord ->
+                        val lngLat = coord as? List<*>
+                        if (lngLat != null && lngLat.size >= 2) {
+                            val lng = (lngLat[0] as? Number)?.toDouble() ?: 0.0
+                            val lat = (lngLat[1] as? Number)?.toDouble() ?: 0.0
+                            points.add(LatLng(lat, lng))
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        withContext(Dispatchers.Main) {
+            pinkRoutePoints.clear()
+            pinkRoutePoints.addAll(points)
+        }
+    }
+
     private suspend fun loadRouteJson(context: Context) {
+
         val points = mutableListOf<LatLng>()
         withContext(Dispatchers.IO) {
             try {
@@ -219,8 +259,10 @@ object KmrlOpenData {
             }
         }
         withContext(Dispatchers.Main) {
-            metroLinePoints.clear()
-            metroLinePoints.addAll(points)
+            // Only add route.json points if we don't have shape points yet
+            if (metroLinePoints.isEmpty()) {
+                metroLinePoints.addAll(points)
+            }
         }
     }
 
