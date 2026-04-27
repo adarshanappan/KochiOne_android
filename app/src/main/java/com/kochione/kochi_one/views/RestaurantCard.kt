@@ -1,5 +1,8 @@
 package com.kochione.kochi_one.views
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -30,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +43,8 @@ import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
 import com.kochione.kochi_one.models.Restaurant
 import com.kochione.kochi_one.ui.components.shimmerEffect
+import com.kochione.kochi_one.utils.KochiLinkType
+import com.kochione.kochi_one.utils.buildKochiDeepLink
 import com.kochione.kochi_one.utils.LocationRepository
 import com.kochione.kochi_one.utils.distanceInKm
 import com.kochione.kochi_one.utils.isOpenAtNow
@@ -52,13 +58,17 @@ fun RestaurantCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val textColor = if (isDarkTheme) Color.White else Color.Black
     val secondaryTextColor = if (isDarkTheme) Color.LightGray else Color.Gray
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable(
+                interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) { onClick() }
             .padding(16.dp)
     ) {
         // Header Section
@@ -181,7 +191,7 @@ fun RestaurantCard(
                 }
             }
 
-            // Distance from user's GPS (hidden when location not yet available)
+            // Distance from user's GPS; fallback keeps right-side distance visible.
             val userLocation by LocationRepository.location.collectAsState()
             val distanceKm = userLocation?.let { loc ->
                 distanceInKm(
@@ -190,19 +200,26 @@ fun RestaurantCard(
                     restaurant.location.longitude
                 )
             }
-            if (distanceKm != null) {
+            val fallbackDistanceKm = restaurant.rating.takeIf { it > 0.0 }
+            val distanceLabel = when {
+                distanceKm != null -> "%.1f km".format(distanceKm)
+                fallbackDistanceKm != null -> "%.1f km".format(fallbackDistanceKm)
+                else -> null
+            }
+            if (distanceLabel != null) {
+                val locationIconTint = if (isDarkTheme) Color.LightGray else Color(0xFF6B7280)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "%.1f km".format(distanceKm),
+                        text = distanceLabel,
                         color = secondaryTextColor,
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Icon(
-                        painter = painterResource(id = R.drawable.ic_transit),
+                        painter = painterResource(id = R.drawable.ic_near_me),
                         contentDescription = "Distance",
-                        tint = textColor,
+                        tint = locationIconTint,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -228,7 +245,7 @@ fun RestaurantCard(
         if (displayImages.isNotEmpty()) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 // Top Row
-                Row(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
                     if (displayImages.isNotEmpty()) {
                         AsyncImage(
                             model = displayImages[0].url,
@@ -255,7 +272,7 @@ fun RestaurantCard(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 // Bottom Row
-                Row(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
                     if (displayImages.size > 2) {
                         AsyncImage(
                             model = displayImages[2].url,
@@ -291,8 +308,25 @@ fun RestaurantCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconAction(painterResId = R.drawable.ic_call, contentDescription = "Call", isDarkTheme = isDarkTheme)
-            IconAction(painterResId = R.drawable.ic_location_custom, contentDescription = "Directions", isDarkTheme = isDarkTheme)
+            IconAction(
+                painterResId = R.drawable.ic_call,
+                contentDescription = "Call",
+                isDarkTheme = isDarkTheme,
+                onClick = { openRestaurantDialer(context, restaurant.contact.phone) }
+            )
+            IconAction(
+                painterResId = R.drawable.ic_location_custom,
+                contentDescription = "Directions",
+                isDarkTheme = isDarkTheme,
+                onClick = {
+                    openRestaurantMap(
+                        context,
+                        restaurant.location.latitude,
+                        restaurant.location.longitude,
+                        restaurant.name
+                    )
+                }
+            )
             var isFavorited by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
             val heartIcon = if (isFavorited) R.drawable.ic_heart_filled else R.drawable.ic_heart
             val heartTint = if (isFavorited) Color.Red else (if (isDarkTheme) Color.LightGray else Color.Gray)
@@ -339,7 +373,7 @@ fun RestaurantCard(
             )
             var isSaved by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
             val saveIcon = if (isSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark
-            val saveTint = if (isSaved) (if (isDarkTheme) Color.White else Color.Black) else (if (isDarkTheme) Color.LightGray else Color.Gray)
+            val saveTint = if (isSaved) Color(0xFF0095FF) else (if (isDarkTheme) Color.LightGray else Color.Gray)
             val saveScale = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
             
             Icon(
@@ -379,7 +413,12 @@ fun RestaurantCard(
                     }
                     .padding(12.dp)
             )
-            IconAction(painterResId = R.drawable.ic_share, contentDescription = "Share", isDarkTheme = isDarkTheme)
+            IconAction(
+                painterResId = R.drawable.ic_share,
+                contentDescription = "Share",
+                isDarkTheme = isDarkTheme,
+                onClick = { shareRestaurantCard(context, restaurant) }
+            )
         }
         androidx.compose.material3.HorizontalDivider(
             color = (if (isDarkTheme) Color.White else Color.Black).copy(alpha = 0.12f),
@@ -393,7 +432,12 @@ fun RestaurantCard(
 }
 
 @Composable
-fun IconAction(painterResId: Int, contentDescription: String, isDarkTheme: Boolean) {
+fun IconAction(
+    painterResId: Int,
+    contentDescription: String,
+    isDarkTheme: Boolean,
+    onClick: () -> Unit
+) {
     val tint = if (isDarkTheme) Color.LightGray else Color.Gray
     Icon(
         painter = painterResource(id = painterResId),
@@ -404,9 +448,39 @@ fun IconAction(painterResId: Int, contentDescription: String, isDarkTheme: Boole
             .clickable(
                 interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = null
-            ) { /* Action */ }
+            ) { onClick() }
             .padding(12.dp)
     )
+}
+
+private fun openRestaurantDialer(context: Context, phone: String?) {
+    if (phone.isNullOrBlank()) return
+    val number = phone.trim().filter { it.isDigit() || it == '+' }
+    if (number.isBlank()) return
+    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))
+    runCatching { context.startActivity(intent) }
+}
+
+private fun openRestaurantMap(context: Context, lat: Double, lon: Double, name: String) {
+    val geo = "geo:$lat,$lon?q=$lat,$lon(${Uri.encode(name)})"
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(geo))
+    runCatching { context.startActivity(intent) }
+}
+
+private fun shareRestaurantCard(context: Context, restaurant: Restaurant) {
+    val deepLink = buildKochiDeepLink(KochiLinkType.FOOD, restaurant.bizId)
+    val shareText = buildString {
+        append("Check out ${restaurant.name} on Kochi One!\n")
+        append(restaurant.description)
+        append("\n\nLocation: ${restaurant.address.street}, ${restaurant.address.city}")
+        append("\n\n$deepLink")
+    }
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, restaurant.name)
+        putExtra(Intent.EXTRA_TEXT, shareText)
+    }
+    runCatching { context.startActivity(Intent.createChooser(intent, "Share via")) }
 }
 
 @Composable
@@ -506,7 +580,7 @@ fun RestaurantSkeletonCard(isDarkTheme: Boolean, modifier: Modifier = Modifier) 
         // Grid of 4 Images (Assuming top 4 images fit the 2x2 grid)
         Column(modifier = Modifier.fillMaxWidth()) {
             // Top Row
-            Row(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -525,7 +599,7 @@ fun RestaurantSkeletonCard(isDarkTheme: Boolean, modifier: Modifier = Modifier) 
             }
             Spacer(modifier = Modifier.height(4.dp))
             // Bottom Row
-            Row(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
                 Box(
                     modifier = Modifier
                         .weight(1f)

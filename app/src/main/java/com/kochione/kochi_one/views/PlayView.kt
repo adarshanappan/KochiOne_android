@@ -66,6 +66,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
@@ -73,6 +75,9 @@ import com.kochione.kochi_one.ui.components.SkeletonBox
 import com.kochione.kochi_one.models.DayHours
 import com.kochione.kochi_one.models.OperatingHours
 import com.kochione.kochi_one.models.PlayVenue
+import com.kochione.kochi_one.models.Restaurant
+import com.kochione.kochi_one.utils.KochiLinkType
+import com.kochione.kochi_one.utils.buildKochiDeepLink
 import com.kochione.kochi_one.viewmodels.PlayViewModel
 import java.util.Calendar
 
@@ -116,14 +121,21 @@ fun PlayView(
     val cardBgColor = if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFE0E0E0)
     val textColor = if (isDarkTheme) Color.White else Color.Black
     var selectedCard by remember { mutableStateOf<PlayCardData?>(null) }
+    var selectedVenue by remember { mutableStateOf<PlayVenue?>(null) }
 
-    androidx.compose.runtime.LaunchedEffect(selectedCard) {
-        onDetailVisibilityChanged(selectedCard != null)
+    androidx.compose.runtime.LaunchedEffect(selectedCard, selectedVenue) {
+        onDetailVisibilityChanged(selectedCard != null || selectedVenue != null)
     }
 
-    DisposableEffect(selectedCard) {
-        if (selectedCard != null) {
-            onRegisterDismissDetail { selectedCard = null }
+    DisposableEffect(selectedCard, selectedVenue) {
+        if (selectedCard != null || selectedVenue != null) {
+            onRegisterDismissDetail {
+                if (selectedVenue != null) {
+                    selectedVenue = null
+                } else {
+                    selectedCard = null
+                }
+            }
         } else {
             onRegisterDismissDetail(null)
         }
@@ -145,48 +157,16 @@ fun PlayView(
             ),
             verticalArrangement = Arrangement.spacedBy(SectionGap)
         ) {
-            if (isLoading && venues.isEmpty()) {
+            if (isLoading) {
                 item {
                     PlayViewCardsSkeleton(isDarkTheme = isDarkTheme)
                 }
             } else if (!isLoading && errorMessage != null && venues.isEmpty()) {
                 item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 40.dp, horizontal = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = textColor.copy(alpha = 0.2f)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Oops! Something went wrong",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = textColor.copy(alpha = 0.6f),
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Button(
-                            onClick = { viewModel.fetchPlayVenues() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = cardBgColor,
-                                contentColor = textColor
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Refresh", fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
+                    NetworkErrorView(
+                        isDarkTheme = isDarkTheme,
+                        onRetry = { viewModel.fetchPlayVenues() }
+                    )
                 }
             } else {
                 item {
@@ -269,12 +249,32 @@ fun PlayView(
             if (card != null) {
                 val detailVenues = buildDetailVenuesForCard(card, venues)
                 if (detailVenues.isNotEmpty()) {
-                    PlayVenueFullScreenSheet(venues = detailVenues, isDarkTheme = isDarkTheme)
+                    PlayVenueFullScreenSheet(
+                        venues = detailVenues,
+                        onVenueClick = { venue -> selectedVenue = venue }
+                    )
                 } else {
                     PlayVenueEmptyFullScreenSheet(card = card, isDarkTheme = isDarkTheme)
                 }
             } else {
                 Spacer(modifier = Modifier.size(0.dp))
+            }
+        }
+        selectedVenue?.let { venue ->
+            Dialog(
+                onDismissRequest = { selectedVenue = null },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = false
+                )
+            ) {
+                FoodDetailView(
+                    restaurant = venue.toRestaurantForDetail(),
+                    isDarkTheme = isDarkTheme,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }
@@ -395,7 +395,16 @@ private fun PlayFeatureCard(
                 spotColor = Color.Black.copy(alpha = 0.35f)
             )
             .clip(RoundedCornerShape(CardCorner))
-            .then(if (onCardClick != null) Modifier.clickable { onCardClick() } else Modifier)
+            .then(
+                if (onCardClick != null) {
+                    Modifier.clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) { onCardClick() }
+                } else {
+                    Modifier
+                }
+            )
     ) {
         when (card.variant) {
             PlayCardVariant.FULL_SNOOKER -> SnookerCardContent(card)
@@ -431,12 +440,18 @@ private fun PlayFeatureCard(
 @Composable
 private fun PlayVenueFullScreenSheet(
     venues: List<PlayVenue>,
-    isDarkTheme: Boolean
+    onVenueClick: (PlayVenue) -> Unit
 ) {
     val context = LocalContext.current
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
-    val textColor = if (isDarkTheme) Color.White else Color.Black
-    val secondaryTextColor = textColor.copy(alpha = 0.62f)
+    val primaryText = if (isDarkTheme) Color.White else Color(0xFF121212)
+    val secondaryText = if (isDarkTheme) Color.White.copy(alpha = 0.62f) else Color(0xFF616161)
+    val bodyText = if (isDarkTheme) Color.White.copy(alpha = 0.72f) else Color(0xFF424242)
+    val distanceText = if (isDarkTheme) Color.White.copy(alpha = 0.7f) else Color(0xFF555555)
+    val locationIconTint = if (isDarkTheme) Color.LightGray else Color(0xFF6B7280)
+    val fallbackIconTint = if (isDarkTheme) Color.White.copy(alpha = 0.9f) else Color(0xFF2E2E2E)
+    val actionIconTint = if (isDarkTheme) Color.White.copy(alpha = 0.76f) else Color.Gray
+    val dividerColor = if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.10f)
     val likedMap = remember { mutableStateMapOf<String, Boolean>() }
     val savedMap = remember { mutableStateMapOf<String, Boolean>() }
 
@@ -467,7 +482,12 @@ private fun PlayVenueFullScreenSheet(
                     val liked = likedMap[venue.id] == true
                     val saved = savedMap[venue.id] == true
 
-                    Column {
+                    Column(
+                        modifier = Modifier.clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) { onVenueClick(venue) }
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -495,7 +515,7 @@ private fun PlayVenueFullScreenSheet(
                                         Icon(
                                             painter = painterResource(id = R.drawable.ic_play),
                                             contentDescription = null,
-                                            tint = textColor.copy(alpha = 0.9f),
+                                            tint = fallbackIconTint,
                     modifier = Modifier
                                                 .padding(10.dp)
                         .fillMaxSize()
@@ -505,7 +525,7 @@ private fun PlayVenueFullScreenSheet(
                                 Column {
                                     Text(
                                         text = venue.name,
-                                        color = textColor,
+                                        color = primaryText,
                                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -525,7 +545,7 @@ private fun PlayVenueFullScreenSheet(
                                         )
                                         Text(
                                             text = " \u00b7 $statusSuffix",
-                                            color = secondaryTextColor,
+                                            color = secondaryText,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     }
@@ -537,13 +557,13 @@ private fun PlayVenueFullScreenSheet(
                             ) {
                                 Text(
                                     text = "${"%.1f".format(venue.rating)} km",
-                                    color = textColor.copy(alpha = 0.7f),
+                                    color = distanceText,
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_near_me),
                                     contentDescription = null,
-                                    tint = Color.Unspecified,
+                                    tint = locationIconTint,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -553,7 +573,7 @@ private fun PlayVenueFullScreenSheet(
 
                         Text(
                             text = venue.description.ifBlank { "No description available." },
-                            color = textColor.copy(alpha = 0.72f),
+                            color = bodyText,
                             style = MaterialTheme.typography.bodyLarge
                         )
 
@@ -615,37 +635,43 @@ private fun PlayVenueFullScreenSheet(
                         ) {
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_call,
-                                tint = textColor.copy(alpha = 0.76f),
+                                tint = actionIconTint,
                                 onClick = { callVenue(context, venue.contact.phone) }
                             )
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_near_me,
-                                tint = textColor.copy(alpha = 0.76f),
+                                tint = actionIconTint,
                                 onClick = { openVenueMap(context, venue.location.latitude, venue.location.longitude, venue.name) }
                             )
                             SheetActionIcon(
                                 iconRes = if (liked) R.drawable.ic_heart_filled else R.drawable.ic_heart,
-                                tint = if (liked) Color(0xFFFF3B30) else textColor.copy(alpha = 0.76f),
+                                tint = if (liked) Color(0xFFFF3B30) else actionIconTint,
                                 isActive = liked,
                                 animateOnActivate = true,
+                                activateScale = 1.3f,
+                                activateDurationMs = 150,
+                                resetDurationMs = 150,
                                 onClick = { likedMap[venue.id] = !liked }
                             )
                             SheetActionIcon(
                                 iconRes = if (saved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
-                                tint = textColor.copy(alpha = 0.76f),
+                                tint = if (saved) Color(0xFF0095FF) else actionIconTint,
                                 isActive = saved,
                                 animateOnActivate = true,
+                                activateScale = 1.2f,
+                                activateDurationMs = 100,
+                                resetDurationMs = 100,
                                 onClick = { savedMap[venue.id] = !saved }
                             )
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_share,
-                                tint = textColor.copy(alpha = 0.76f),
+                                tint = actionIconTint,
                                 onClick = { shareVenue(context, venue) }
                             )
                         }
  
                         Spacer(modifier = Modifier.height(14.dp))
-                        HorizontalDivider(color = textColor.copy(alpha = 0.08f))
+                        HorizontalDivider(color = dividerColor)
                     }
                 }
                 item { Spacer(modifier = Modifier.height(20.dp)) }
@@ -655,16 +681,20 @@ private fun PlayVenueFullScreenSheet(
 }
 
 private fun buildDetailVenuesForCard(card: PlayCardData, allVenues: List<PlayVenue>): List<PlayVenue> {
-    if (card.variant == PlayCardVariant.HERO_LEFT) {
-        val soccerVenues = allVenues.filter { venue ->
-            val n = venue.name.lowercase()
-            val c = venue.playCategory.lowercase()
-            n.contains("soccer") || n.contains("football") || n.contains("futsal") ||
-                c.contains("soccer") || c.contains("football") || c.contains("futsal")
-        }
-        return if (soccerVenues.isNotEmpty()) soccerVenues else listOfNotNull(card.venue)
+    val keys = when (card.variant) {
+        PlayCardVariant.HERO_LEFT -> listOf("soccer", "football", "futsal")
+        PlayCardVariant.STACK_TOP -> listOf("cricket")
+        PlayCardVariant.STACK_BOTTOM -> listOf("badminton")
+        PlayCardVariant.FULL_FUN -> listOf("fun", "activity", "activities", "adventure", "go-kart", "kart")
+        PlayCardVariant.FULL_GAME -> listOf("game", "gaming", "arcade", "console")
+        PlayCardVariant.FULL_SNOOKER -> listOf("snooker", "pool", "billiard")
     }
-    return listOfNotNull(card.venue)
+    val matchedVenues = allVenues.filter { venue ->
+        val n = venue.name.lowercase()
+        val c = venue.playCategory.lowercase()
+        keys.any { key -> n.contains(key) || c.contains(key) }
+    }
+    return if (matchedVenues.isNotEmpty()) matchedVenues else listOfNotNull(card.venue)
 }
 
 @Composable
@@ -677,7 +707,10 @@ private fun CircleIconButton(
     Surface(
         modifier = Modifier
             .size(size)
-            .clickable { onClick() },
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) { onClick() },
         shape = CircleShape,
         color = backgroundColor
     ) {
@@ -691,6 +724,9 @@ private fun SheetActionIcon(
     tint: Color = Color.White.copy(alpha = 0.76f),
     isActive: Boolean = false,
     animateOnActivate: Boolean = false,
+    activateScale: Float = 1.25f,
+    activateDurationMs: Int = 110,
+    resetDurationMs: Int = 100,
     onClick: () -> Unit
 ) {
     val scale = remember { Animatable(1f) }
@@ -698,10 +734,8 @@ private fun SheetActionIcon(
     LaunchedEffect(isActive, animateOnActivate) {
         if (!animateOnActivate) return@LaunchedEffect
         if (isActive) {
-            scale.animateTo(
-                targetValue = 1.25f,
-                animationSpec = tween(durationMillis = 110)
-            )
+            // Match the same pop animation feel used in list/session action icons.
+            scale.animateTo(targetValue = activateScale, animationSpec = tween(durationMillis = activateDurationMs))
             scale.animateTo(
                 targetValue = 1f,
                 animationSpec = spring(
@@ -712,7 +746,7 @@ private fun SheetActionIcon(
         } else {
             scale.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 100)
+                animationSpec = tween(durationMillis = resetDurationMs)
             )
         }
     }
@@ -779,10 +813,12 @@ private fun openVenueMap(context: android.content.Context, lat: Double, lon: Dou
 }
 
 private fun shareVenue(context: android.content.Context, venue: PlayVenue) {
+    val deepLink = buildKochiDeepLink(KochiLinkType.PLAY, venue.bizId)
     val shareText = buildString {
         append("Check out ${venue.name} on Kochi One!\n")
         append(venue.description)
         append("\n\nLocation: ${venue.address.street}, ${venue.address.city}")
+        append("\n\n$deepLink")
     }
     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
         type = "text/plain"
@@ -790,6 +826,32 @@ private fun shareVenue(context: android.content.Context, venue: PlayVenue) {
         putExtra(android.content.Intent.EXTRA_TEXT, shareText)
     }
     context.startActivity(android.content.Intent.createChooser(intent, "Share via"))
+}
+
+private fun PlayVenue.toRestaurantForDetail(): Restaurant {
+    return Restaurant(
+        id = id,
+        bizId = bizId,
+        name = name,
+        description = description,
+        logo = logo,
+        coverImages = coverImages ?: emptyList(),
+        address = address,
+        location = location,
+        contact = contact,
+        cuisine = emptyList(),
+        features = features,
+        rating = rating,
+        ranking = ranking,
+        operatingHours = operatingHours,
+        isActive = isActive,
+        owner = null,
+        images = coverImages?.mapNotNull { it.url.takeIf { url -> url.isNotBlank() } } ?: emptyList(),
+        restaurantType = playCategory,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        v = 0
+    )
 }
 
 @Composable
