@@ -11,6 +11,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class ExploreViewModel : ViewModel() {
+    private companion object {
+        const val MIN_LOADING_MS = 1000L
+        const val MIN_ERROR_LOADING_MS = 7000L
+    }
 
     private val _posts = MutableStateFlow<List<ExplorePost>>(emptyList())
     
@@ -29,6 +33,7 @@ class ExploreViewModel : ViewModel() {
     fun fetchPosts() {
         viewModelScope.launch {
             val startTime = System.currentTimeMillis()
+            var hasError = false
             _isLoading.value = true
             _errorMessage.value = null
             try {
@@ -37,14 +42,17 @@ class ExploreViewModel : ViewModel() {
                 if (response.status == "success") {
                     _posts.value = response.data.posts
                 } else {
+                    hasError = true
                     _errorMessage.value = "Failed to load posts"
                 }
             } catch (e: Exception) {
+                hasError = true
                 _errorMessage.value = "Network error: ${e.localizedMessage}"
             } finally {
-                // Ensure skeleton is visible for at least 1 second to avoid jarring flashes
+                // Keep loader visible longer on failure to match slow-network UX.
                 val elapsedTime = System.currentTimeMillis() - startTime
-                val remainingTime = 1000 - elapsedTime
+                val targetMinLoading = if (hasError) MIN_ERROR_LOADING_MS else MIN_LOADING_MS
+                val remainingTime = targetMinLoading - elapsedTime
                 if (remainingTime > 0) {
                     delay(remainingTime)
                 }

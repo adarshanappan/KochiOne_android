@@ -9,6 +9,7 @@ import com.kochione.kochi_one.api.RetrofitClient
 import com.kochione.kochi_one.models.FitnessVenue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +20,8 @@ import kotlinx.coroutines.withContext
 class FitnessViewModel : ViewModel() {
     private companion object {
         const val API_ORIGIN = "https://api.kochi.one"
+        const val MIN_LOADING_MS = 900L
+        const val MIN_ERROR_LOADING_MS = 7000L
     }
 
     private val _venues = MutableStateFlow<List<FitnessVenue>>(emptyList())
@@ -39,6 +42,8 @@ class FitnessViewModel : ViewModel() {
 
     fun fetchFitnessVenues() {
         viewModelScope.launch {
+            val startTime = System.currentTimeMillis()
+            var hasError = false
             _isLoading.value = true
             _errorMessage.value = null
             try {
@@ -49,17 +54,17 @@ class FitnessViewModel : ViewModel() {
                     val response = try {
                         venuesDeferred.await()
                     } catch (e: Exception) {
+                        hasError = true
                         _errorMessage.value = "Network error: ${e.localizedMessage}"
-                        _isLoading.value = false
                         return@supervisorScope
                     }
 
                     if (response.status == "success") {
                         _venues.value = response.data.venues
                     } else {
+                        hasError = true
                         _errorMessage.value = "Failed to load fitness venues"
                     }
-                    _isLoading.value = false
 
                     try {
                         val thumbnails = thumbsDeferred.await()
@@ -74,6 +79,11 @@ class FitnessViewModel : ViewModel() {
             } catch (e: Exception) {
                 _errorMessage.value = "Network error: ${e.localizedMessage}"
             } finally {
+                val elapsed = System.currentTimeMillis() - startTime
+                val targetMinLoading = if (hasError) MIN_ERROR_LOADING_MS else MIN_LOADING_MS
+                if (elapsed < targetMinLoading) {
+                    delay(targetMinLoading - elapsed)
+                }
                 _isLoading.value = false
             }
         }

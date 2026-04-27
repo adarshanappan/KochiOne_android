@@ -1066,40 +1066,35 @@ fun ThreeStateBottomSheet(
             
             HorizontalDivider(color = dividerColor)
 
-            // Keep a stable layout height to avoid "jump" when toggling details.
-            if (playOrFitnessDetailOpen) {
-                Spacer(modifier = Modifier.height(bottomNavReservedHeight))
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(bgColor)
-                        .height(bottomNavReservedHeight)
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .padding(bottom = 16.dp), // Extra padding for window bottom edge
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore") { 
-                        onTabSelected("Explore")
-                        coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-                    }
-                    NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food") { 
-                        onTabSelected("Food")
-                        coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-                    }
-                    NavItem(R.drawable.ic_play, "Play", selectedTab == "Play") { 
-                        onTabSelected("Play")
-                        coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-                    }
-                    NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness") { 
-                        onTabSelected("Fitness")
-                        coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-                    }
-                    NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit") { 
-                        onTabSelected("Transit")
-                        coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-                    }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(bgColor)
+                    .height(bottomNavReservedHeight)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(bottom = 16.dp), // Extra padding for window bottom edge
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore") {
+                    onTabSelected("Explore")
+                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                }
+                NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food") {
+                    onTabSelected("Food")
+                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                }
+                NavItem(R.drawable.ic_play, "Play", selectedTab == "Play") {
+                    onTabSelected("Play")
+                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                }
+                NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness") {
+                    onTabSelected("Fitness")
+                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                }
+                NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit") {
+                    onTabSelected("Transit")
+                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
                 }
             }
         }

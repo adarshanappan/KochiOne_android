@@ -7,8 +7,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -67,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -85,6 +89,8 @@ import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
 import com.kochione.kochi_one.models.DayHours
 import com.kochione.kochi_one.models.Restaurant
+import com.kochione.kochi_one.utils.KochiLinkType
+import com.kochione.kochi_one.utils.buildKochiDeepLink
 import com.kochione.kochi_one.utils.isOpenAtNow
 import com.kochione.kochi_one.utils.minutesUntilCloseIfOpen
 import kotlin.math.abs
@@ -97,7 +103,7 @@ fun FoodDetailView(
     isDarkTheme: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val pageBg = if (isDarkTheme) Color(0xFF15171B) else Color(0xFFF4F5F7)
+    val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val images = remember(restaurant) {
         restaurant.coverImages.map { it.url }.ifEmpty {
             listOfNotNull(restaurant.logo?.url)
@@ -171,7 +177,10 @@ fun FoodDetailView(
                             .size(44.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF3D3D3D))
-                            .clickable { closeFullGallery() },
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) { closeFullGallery() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -238,7 +247,10 @@ fun FoodDetailView(
                                     }
                                 )
                                 .clip(fullscreenThumbShape)
-                                .clickable {
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = null
+                                ) {
                                     fullscreenScope.launch {
                                         fullscreenPagerState.animateScrollToPage(index)
                                     }
@@ -293,7 +305,7 @@ private fun FoodDetailSheetTop() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (isDarkTheme) Color(0xFF15171B) else Color(0xFFF4F5F7))
+            .background(if (isDarkTheme) Color(0xFF1E1E1E) else Color.White)
 //            .padding(top = 10.dp, bottom = 8.dp),
 //        contentAlignment = Alignment.Center
     ) {
@@ -408,6 +420,8 @@ private fun FoodDetailGallerySection(
     onSelectedIndexChange: (Int) -> Unit,
     onRequestFullGallery: () -> Unit
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val selectedThumbBorderColor = if (isDarkTheme) Color.White else Color.Black
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -491,8 +505,12 @@ private fun FoodDetailGallerySection(
                 Text(
                     text = "${selectedIndex + 1}",
                     color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 )
             }
         }
@@ -511,7 +529,10 @@ private fun FoodDetailGallerySection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             repeat(images.size) { index ->
-                GalleryPagerMorphDot(isSelected = index == selectedIndex)
+                GalleryPagerMorphDot(
+                    isSelected = index == selectedIndex,
+                    isDarkTheme = isDarkTheme
+                )
             }
         }
 
@@ -536,20 +557,23 @@ private fun FoodDetailGallerySection(
                         .alpha(thumbAlpha)
                         .then(
                             if (isSelected) {
-                                Modifier.border(2.dp, Color.White, thumbShape)
+                                Modifier.border(2.dp, selectedThumbBorderColor, thumbShape)
                             } else {
                                 Modifier
                             }
                         )
                         .clip(thumbShape)
-                        .clickable { onSelectedIndexChange(index) }
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) { onSelectedIndexChange(index) }
                 ) {
                     AsyncImage(
                         model = imageUrl,
                         contentDescription = "Thumbnail ${index + 1}",
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFF2A2E35)),
+                            .background(Color(0xFF1E1E1E)),
                         contentScale = ContentScale.Crop
                     )
                 }
@@ -562,7 +586,10 @@ private fun FoodDetailGallerySection(
 }
 
 @Composable
-private fun GalleryPagerMorphDot(isSelected: Boolean) {
+private fun GalleryPagerMorphDot(
+    isSelected: Boolean,
+    isDarkTheme: Boolean
+) {
     val morphDurationMs = 320
     val morphEase = FastOutSlowInEasing
     val dotWidth by animateDpAsState(
@@ -571,7 +598,12 @@ private fun GalleryPagerMorphDot(isSelected: Boolean) {
         label = "gallery_pager_dot_width"
     )
     val dotColor by animateColorAsState(
-        targetValue = if (isSelected) Color.White else Color(0xFF343A43),
+        targetValue = when {
+            isDarkTheme && isSelected -> Color.White
+            isDarkTheme && !isSelected -> Color(0xFF343A43)
+            !isDarkTheme && isSelected -> Color.Black
+            else -> Color.Black.copy(alpha = 0.18f)
+        },
         animationSpec = tween(morphDurationMs, easing = morphEase),
         label = "gallery_pager_dot_color"
     )
@@ -631,10 +663,10 @@ private fun Modifier.galleryHorizontalPageSwipe(
 @Composable
 private fun FoodDetailStatsRow(restaurant: Restaurant) {
     val isDarkTheme = isSystemInDarkTheme()
-    val panelBg = if (isDarkTheme) Color(0xFF1C1F24) else Color(0xFFFFFFFF)
+    val panelBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFFFFFFF)
     val primaryText = if (isDarkTheme) Color.White else Color(0xFF111418)
     val secondaryText = if (isDarkTheme) Color(0xFF9EA3AE) else Color(0xFF6B7280)
-    val divider = if (isDarkTheme) Color(0xFF323842) else Color(0xFFE2E6EC)
+    val divider = if (isDarkTheme) Color.White.copy(alpha = 0.16f) else Color(0xFFE2E6EC)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -704,35 +736,40 @@ private fun FoodDetailStatsRow(restaurant: Restaurant) {
 private fun FoodDetailInfoSection(restaurant: Restaurant) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
-    val cardBg = if (isDarkTheme) Color(0xFF20242A) else Color(0xFFFFFFFF)
+    val cardBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFFFFFFF)
     val primaryText = if (isDarkTheme) Color.White else Color(0xFF111418)
     val buttonBorder = if (isDarkTheme) Color(0xFF60656D) else Color(0xFFD0D4DB)
+    val cuisineChipBg = if (isDarkTheme) Color(0xFF22252B) else Color(0xFFF2F3F5)
+    val cuisineChipBorder = if (isDarkTheme) Color(0xFF31353C) else Color.Black.copy(alpha = 0.10f)
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
-        SectionTitle("Cuisine")
-        Spacer(modifier = Modifier.height(12.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            items(restaurant.cuisine.ifEmpty { listOf("Other") }) { item ->
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(cardBg)
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Text(
-                        text = "\uD83C\uDF74  $item",
-                        color = primaryText,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
+        if (restaurant.cuisine.isNotEmpty()) {
+            SectionTitle("Cuisine")
+            Spacer(modifier = Modifier.height(12.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                items(restaurant.cuisine) { item ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(cuisineChipBg)
+                            .border(1.dp, cuisineChipBorder, RoundedCornerShape(14.dp))
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = "\uD83C\uDF74  $item",
+                            color = primaryText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(22.dp))
+        }
         SectionTitle("Features")
         Spacer(modifier = Modifier.height(10.dp))
         val features = restaurant.features.ifEmpty { listOf("No features available") }
@@ -1127,7 +1164,7 @@ fun FoodDetailActionBar(
     var isSaved by remember { mutableStateOf(false) }
 
     // Transparent Glassmorphism style
-    val barBg = if (isDarkTheme) Color(0x991A1D21) else Color(0x99FFFFFF)
+    val barBg = if (isDarkTheme) Color(0xCC1E1E1E) else Color(0x99FFFFFF)
     val glassBorder = if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.1f)
     val iconTint = if (isDarkTheme) Color.White else Color(0xFF111418)
 
@@ -1169,12 +1206,22 @@ fun FoodDetailActionBar(
                 iconRes = if (isLiked) R.drawable.ic_heart_filled else R.drawable.ic_heart,
                 contentDescription = "Like",
                 tint = if (isLiked) Color(0xFFFF4B4B) else iconTint,
+                isActive = isLiked,
+                animateOnActivate = true,
+                activateScale = 1.3f,
+                activateDurationMs = 150,
+                resetDurationMs = 150,
                 onClick = { isLiked = !isLiked }
             )
             ActionBarIcon(
                 iconRes = if (isSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
                 contentDescription = "Save",
                 tint = if (isSaved) Color(0xFF0095FF) else iconTint,
+                isActive = isSaved,
+                animateOnActivate = true,
+                activateScale = 1.2f,
+                activateDurationMs = 100,
+                resetDurationMs = 100,
                 onClick = { isSaved = !isSaved }
             )
             ActionBarIcon(
@@ -1192,13 +1239,41 @@ private fun ActionBarIcon(
     iconRes: Int,
     contentDescription: String,
     tint: Color,
+    isActive: Boolean = false,
+    animateOnActivate: Boolean = false,
+    activateScale: Float = 1.25f,
+    activateDurationMs: Int = 110,
+    resetDurationMs: Int = 100,
     onClick: () -> Unit
 ) {
+    val scale = remember { Animatable(1f) }
+    LaunchedEffect(isActive, animateOnActivate) {
+        if (!animateOnActivate) return@LaunchedEffect
+        if (isActive) {
+            // Match the same pop animation feel used in list/session action icons.
+            scale.animateTo(activateScale, animationSpec = tween(durationMillis = activateDurationMs))
+            scale.animateTo(
+                1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
+        } else {
+            scale.animateTo(1f, animationSpec = tween(durationMillis = resetDurationMs))
+        }
+    }
+
     Box(
         modifier = Modifier
             .size(48.dp)
             .clip(CircleShape)
-            .clickable(onClick = onClick),
+            .scale(scale.value)
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -1237,6 +1312,7 @@ private fun openMapDirections(context: Context, lat: Double, lng: Double, label:
 }
 
 private fun shareRestaurant(context: Context, restaurant: Restaurant) {
+    val deepLink = buildKochiDeepLink(KochiLinkType.FOOD, restaurant.bizId)
     val shareText = """
         Check out ${restaurant.name} on Kochi One!
         
@@ -1244,6 +1320,8 @@ private fun shareRestaurant(context: Context, restaurant: Restaurant) {
         
         Rating: ${restaurant.rating} ★
         Address: ${restaurant.address.street}, ${restaurant.address.city}
+
+        $deepLink
         
         Download Kochi One for more!
     """.trimIndent()

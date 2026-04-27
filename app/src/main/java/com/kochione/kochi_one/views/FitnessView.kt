@@ -50,12 +50,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
+import com.kochione.kochi_one.ui.components.SkeletonBox
 import com.kochione.kochi_one.models.DayHours
 import com.kochione.kochi_one.models.FitnessVenue
 import com.kochione.kochi_one.models.OperatingHours
+import com.kochione.kochi_one.models.Restaurant
+import com.kochione.kochi_one.utils.KochiLinkType
+import com.kochione.kochi_one.utils.buildKochiDeepLink
 import com.kochione.kochi_one.viewmodels.FitnessViewModel
 import java.util.Calendar
 
@@ -90,19 +96,28 @@ fun FitnessView(
 ) {
     val venues by viewModel.venues.collectAsState()
     val categoryThumbnails by viewModel.categoryThumbnails.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
     // Theme handled by parameter
-    val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFF5F5F5)
+    val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     var selectedCard by remember { mutableStateOf<FitnessCardData?>(null) }
+    var selectedVenue by remember { mutableStateOf<FitnessVenue?>(null) }
 
-    androidx.compose.runtime.LaunchedEffect(selectedCard) {
-        onDetailVisibilityChanged(selectedCard != null)
+    androidx.compose.runtime.LaunchedEffect(selectedCard, selectedVenue) {
+        onDetailVisibilityChanged(selectedCard != null || selectedVenue != null)
     }
 
-    DisposableEffect(selectedCard) {
-        if (selectedCard != null) {
-            onRegisterDismissDetail { selectedCard = null }
+    DisposableEffect(selectedCard, selectedVenue) {
+        if (selectedCard != null || selectedVenue != null) {
+            onRegisterDismissDetail {
+                if (selectedVenue != null) {
+                    selectedVenue = null
+                } else {
+                    selectedCard = null
+                }
+            }
         } else {
-            onRegisterDismissDetail(null)
+           
         }
         onDispose { onRegisterDismissDetail(null) }
     }
@@ -120,57 +135,70 @@ fun FitnessView(
             ),
             verticalArrangement = Arrangement.spacedBy(FitnessSectionGap)
         ) {
-            item {
-                val cards = remember(venues, categoryThumbnails) { buildFitnessCards(venues, categoryThumbnails) }
-                val hero = cards[0]
-                val stackTop = cards[1]
-                val stackBottom = cards[2]
+            if (isLoading) {
+                item {
+                    FitnessViewCardsSkeleton(isDarkTheme = isDarkTheme)
+                }
+            } else if (!isLoading && errorMessage != null && venues.isEmpty()) {
+                item {
+                    NetworkErrorView(
+                        isDarkTheme = isDarkTheme,
+                        onRetry = { viewModel.fetchFitnessVenues() }
+                    )
+                }
+            } else {
+                item {
+                    val cards = remember(venues, categoryThumbnails) { buildFitnessCards(venues, categoryThumbnails) }
+                    val hero = cards[0]
+                    val stackTop = cards[1]
+                    val stackBottom = cards[2]
 
-                Column(verticalArrangement = Arrangement.spacedBy(FitnessSectionGap)) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(FitnessTopRowHeight),
-                        horizontalArrangement = Arrangement.spacedBy(FitnessSectionGap)
-                    ) {
-                        FitnessFeatureCard(
-                            card = hero,
-                            modifier = Modifier
-                                .weight(0.54f)
-                                .fillMaxHeight(),
-                            onCardClick = { selectedCard = hero }
-                        )
-                        Column(
-                            modifier = Modifier
-                                .weight(0.49f)
-                                .fillMaxHeight(),
-                            verticalArrangement = Arrangement.spacedBy(FitnessSectionGap)
-                        ) {
-                            FitnessFeatureCard(
-                                card = stackTop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                onCardClick = { selectedCard = stackTop }
-                            )
-                            FitnessFeatureCard(
-                                card = stackBottom,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                onCardClick = { selectedCard = stackBottom }
-                            )
-                        }
-                    }
-
-                    cards.drop(3).forEach { card ->
-                        FitnessFeatureCard(
-                            card = card,
+                    Column(verticalArrangement = Arrangement.spacedBy(FitnessSectionGap)) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(172.dp),
-                            onCardClick = { selectedCard = card }
-                        )
+                                .height(FitnessTopRowHeight),
+                            horizontalArrangement = Arrangement.spacedBy(FitnessSectionGap)
+                        ) {
+                            FitnessFeatureCard(
+                                card = hero,
+                                modifier = Modifier
+                                    .weight(0.50f)
+                                    .fillMaxHeight(),
+                                onCardClick = { selectedCard = hero }
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .weight(0.50f)
+                                    .fillMaxHeight(),
+                                verticalArrangement = Arrangement.spacedBy(FitnessSectionGap)
+                            ) {
+                                FitnessFeatureCard(
+                                    card = stackTop,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    onCardClick = { selectedCard = stackTop }
+                                )
+                                FitnessFeatureCard(
+                                    card = stackBottom,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                    onCardClick = { selectedCard = stackBottom }
+                                )
+                            }
+                        }
+
+                        cards.drop(3).forEach { card ->
+                            FitnessFeatureCard(
+                                card = card,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(172.dp),
+                                onCardClick = { selectedCard = card }
+                            )
+                        }
                     }
                 }
             }
@@ -178,10 +206,75 @@ fun FitnessView(
         if (selectedCard != null) {
             val detailVenues = buildFitnessDetailVenuesForCard(selectedCard!!, venues)
             if (detailVenues.isNotEmpty()) {
-                FitnessVenueFullScreenSheet(venues = detailVenues)
+                FitnessVenueFullScreenSheet(
+                    venues = detailVenues,
+                    onVenueClick = { venue -> selectedVenue = venue }
+                )
             } else {
                 FitnessVenueEmptyFullScreenSheet(card = selectedCard!!)
             }
+        }
+        selectedVenue?.let { venue ->
+            Dialog(
+                onDismissRequest = { selectedVenue = null },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = false
+                )
+            ) {
+                FoodDetailView(
+                    restaurant = venue.toRestaurantForDetail(),
+                    isDarkTheme = isDarkTheme,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FitnessViewCardsSkeleton(isDarkTheme: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(FitnessSectionGap)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(FitnessTopRowHeight),
+            horizontalArrangement = Arrangement.spacedBy(FitnessSectionGap)
+        ) {
+            SkeletonBox(
+                modifier = Modifier
+                    .weight(0.50f)
+                    .fillMaxHeight(),
+                shape = RoundedCornerShape(FitnessCardCorner),
+                isDarkTheme = isDarkTheme
+            )
+            Column(
+                modifier = Modifier
+                    .weight(0.50f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(FitnessSectionGap)
+            ) {
+                repeat(2) {
+                    SkeletonBox(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        shape = RoundedCornerShape(FitnessCardCorner),
+                        isDarkTheme = isDarkTheme
+                    )
+                }
+            }
+        }
+        repeat(2) {
+            SkeletonBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(172.dp),
+                shape = RoundedCornerShape(FitnessCardCorner),
+                isDarkTheme = isDarkTheme
+            )
         }
     }
 }
@@ -208,7 +301,16 @@ private fun FitnessFeatureCard(
                 spotColor = Color.Black.copy(alpha = 0.35f)
             )
             .clip(RoundedCornerShape(FitnessCardCorner))
-            .then(if (onCardClick != null) Modifier.clickable { onCardClick() } else Modifier)
+            .then(
+                if (onCardClick != null) {
+                    Modifier.clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) { onCardClick() }
+                } else {
+                    Modifier
+                }
+            )
     ) {
         when (card.variant) {
             FitnessCardVariant.FULL_CENTRE -> FitnessCentreCardContent(card)
@@ -252,7 +354,7 @@ private fun BoxScope.FitnessCardBottomContent(card: FitnessCardData) {
         modifier = Modifier
             .align(if (isHealth) Alignment.Center else Alignment.BottomStart)
             .padding(
-                start = if (isStackCard) 32.dp else 20.dp,
+                start = 20.dp,
                 end = if (isHealth) 50.dp else 18.dp,
                 top = if (isHealth) 70.dp else 0.dp,
                 bottom = if (isHealth) 20.dp else 16.dp
@@ -283,8 +385,7 @@ private fun BoxScope.FitnessCardBottomContent(card: FitnessCardData) {
             overflow = TextOverflow.Ellipsis,
             modifier = when {
                 isHealth -> Modifier.fillMaxWidth()
-                isYoga || isMma -> Modifier.fillMaxWidth().padding(start = 58.dp)
-                isStackCard -> Modifier.fillMaxWidth().padding(start = 18.dp)
+                isStackCard -> Modifier.fillMaxWidth()
                 else -> Modifier
             },
             textAlign = when {
@@ -306,7 +407,7 @@ private fun BoxScope.FitnessCardBottomContent(card: FitnessCardData) {
             overflow = TextOverflow.Ellipsis,
             modifier = when {
                 isHealth -> Modifier.fillMaxWidth()
-                isStackCard -> Modifier.fillMaxWidth().padding(start = if (isYoga) 10.dp else 18.dp)
+                isStackCard -> Modifier.fillMaxWidth()
                 else -> Modifier
             },
             textAlign = if (isHealth) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start
@@ -473,11 +574,20 @@ private fun FitnessVenueEmptyFullScreenSheet(card: FitnessCardData) {
 
 @Composable
 private fun FitnessVenueFullScreenSheet(
-    venues: List<FitnessVenue>
+    venues: List<FitnessVenue>,
+    onVenueClick: (FitnessVenue) -> Unit
 ) {
     val context = LocalContext.current
     val isDarkTheme = isSystemInDarkTheme()
     val pageBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
+    val primaryText = if (isDarkTheme) Color.White else Color(0xFF121212)
+    val secondaryText = if (isDarkTheme) Color.White.copy(alpha = 0.62f) else Color(0xFF616161)
+    val bodyText = if (isDarkTheme) Color.White.copy(alpha = 0.72f) else Color(0xFF424242)
+    val distanceText = if (isDarkTheme) Color.White.copy(alpha = 0.7f) else Color(0xFF555555)
+    val locationIconTint = if (isDarkTheme) Color.LightGray else Color(0xFF6B7280)
+    val fallbackIconTint = if (isDarkTheme) Color.White.copy(alpha = 0.9f) else Color(0xFF2E2E2E)
+    val actionIconTint = if (isDarkTheme) Color.White.copy(alpha = 0.76f) else Color.Gray
+    val dividerColor = if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.10f)
     val likedMap = remember { mutableStateMapOf<String, Boolean>() }
     val savedMap = remember { mutableStateMapOf<String, Boolean>() }
 
@@ -508,7 +618,12 @@ private fun FitnessVenueFullScreenSheet(
                     val liked = likedMap[venue.id] == true
                     val saved = savedMap[venue.id] == true
 
-                    Column {
+                    Column(
+                        modifier = Modifier.clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) { onVenueClick(venue) }
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -536,7 +651,7 @@ private fun FitnessVenueFullScreenSheet(
                                         Icon(
                                             painter = painterResource(id = R.drawable.ic_fitness),
                                             contentDescription = null,
-                                            tint = Color.White.copy(alpha = 0.9f),
+                                            tint = fallbackIconTint,
                                             modifier = Modifier
                                                 .padding(10.dp)
                                                 .fillMaxSize()
@@ -546,7 +661,7 @@ private fun FitnessVenueFullScreenSheet(
                                 Column {
                                     Text(
                                         text = venue.name,
-                                        color = Color.White,
+                                        color = primaryText,
                                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -566,7 +681,7 @@ private fun FitnessVenueFullScreenSheet(
                                         )
                                         Text(
                                             text = " \u00b7 $statusSuffix",
-                                            color = Color.White.copy(alpha = 0.62f),
+                                            color = secondaryText,
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     }
@@ -578,13 +693,13 @@ private fun FitnessVenueFullScreenSheet(
                             ) {
                                 Text(
                                     text = "${"%.1f".format(venue.rating)} km",
-                                    color = Color.White.copy(alpha = 0.7f),
+                                    color = distanceText,
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_near_me),
                                     contentDescription = null,
-                                    tint = Color.Unspecified,
+                                    tint = locationIconTint,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -593,7 +708,7 @@ private fun FitnessVenueFullScreenSheet(
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = venue.description.ifBlank { "No description available." },
-                            color = Color.White.copy(alpha = 0.72f),
+                            color = bodyText,
                             style = MaterialTheme.typography.bodyLarge,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis
@@ -654,32 +769,42 @@ private fun FitnessVenueFullScreenSheet(
                         ) {
                             FitnessSheetActionIcon(
                                 iconRes = R.drawable.ic_call,
+                                tint = actionIconTint,
                                 onClick = { callFitnessVenue(context, venue.contact.phone) }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = R.drawable.ic_near_me,
+                                tint = actionIconTint,
                                 onClick = { openFitnessVenueMap(context, venue.location.latitude, venue.location.longitude, venue.name) }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = if (liked) R.drawable.ic_heart_filled else R.drawable.ic_heart,
-                                tint = if (liked) Color(0xFFFF3B30) else Color.White.copy(alpha = 0.76f),
+                                tint = if (liked) Color(0xFFFF3B30) else actionIconTint,
                                 isActive = liked,
                                 animateOnActivate = true,
+                                activateScale = 1.3f,
+                                activateDurationMs = 150,
+                                resetDurationMs = 150,
                                 onClick = { likedMap[venue.id] = !liked }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = if (saved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
+                                tint = if (saved) Color(0xFF0095FF) else actionIconTint,
                                 isActive = saved,
                                 animateOnActivate = true,
+                                activateScale = 1.2f,
+                                activateDurationMs = 100,
+                                resetDurationMs = 100,
                                 onClick = { savedMap[venue.id] = !saved }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = R.drawable.ic_share,
+                                tint = actionIconTint,
                                 onClick = { shareFitnessVenue(context, venue) }
                             )
                         }
                         Spacer(modifier = Modifier.height(14.dp))
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                        HorizontalDivider(color = dividerColor)
                     }
                 }
                 item { Spacer(modifier = Modifier.height(20.dp)) }
@@ -694,13 +819,17 @@ private fun FitnessSheetActionIcon(
     tint: Color = Color.White.copy(alpha = 0.76f),
     isActive: Boolean = false,
     animateOnActivate: Boolean = false,
+    activateScale: Float = 1.25f,
+    activateDurationMs: Int = 110,
+    resetDurationMs: Int = 100,
     onClick: () -> Unit
 ) {
     val scale = remember { androidx.compose.animation.core.Animatable(1f) }
     LaunchedEffect(isActive, animateOnActivate) {
         if (!animateOnActivate) return@LaunchedEffect
         if (isActive) {
-            scale.animateTo(1.25f, animationSpec = androidx.compose.animation.core.tween(durationMillis = 110))
+            // Match the same pop animation feel used in list/session action icons.
+            scale.animateTo(activateScale, animationSpec = androidx.compose.animation.core.tween(durationMillis = activateDurationMs))
             scale.animateTo(
                 1f,
                 animationSpec = androidx.compose.animation.core.spring(
@@ -709,7 +838,7 @@ private fun FitnessSheetActionIcon(
                 )
             )
         } else {
-            scale.animateTo(1f, animationSpec = androidx.compose.animation.core.tween(durationMillis = 100))
+            scale.animateTo(1f, animationSpec = androidx.compose.animation.core.tween(durationMillis = resetDurationMs))
         }
     }
 
@@ -775,10 +904,12 @@ private fun openFitnessVenueMap(context: android.content.Context, lat: Double, l
 }
 
 private fun shareFitnessVenue(context: android.content.Context, venue: FitnessVenue) {
+    val deepLink = buildKochiDeepLink(KochiLinkType.FITNESS, venue.bizId)
     val shareText = buildString {
         append("Check out ${venue.name} on Kochi One!\n")
         append(venue.description)
         append("\n\nLocation: ${venue.address.street}, ${venue.address.city}")
+        append("\n\n$deepLink")
     }
     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
         type = "text/plain"
@@ -786,6 +917,32 @@ private fun shareFitnessVenue(context: android.content.Context, venue: FitnessVe
         putExtra(android.content.Intent.EXTRA_TEXT, shareText)
     }
     context.startActivity(android.content.Intent.createChooser(intent, "Share via"))
+}
+
+private fun FitnessVenue.toRestaurantForDetail(): Restaurant {
+    return Restaurant(
+        id = id,
+        bizId = bizId,
+        name = name,
+        description = description,
+        logo = logo,
+        coverImages = coverImages ?: emptyList(),
+        address = address,
+        location = location,
+        contact = contact,
+        cuisine = emptyList(),
+        features = features,
+        rating = rating,
+        ranking = ranking,
+        operatingHours = operatingHours,
+        isActive = isActive,
+        owner = null,
+        images = coverImages?.mapNotNull { it.url.takeIf { url -> url.isNotBlank() } } ?: emptyList(),
+        restaurantType = fitnessCategory,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        v = 0
+    )
 }
 
 private fun buildFitnessDetailVenuesForCard(card: FitnessCardData, allVenues: List<FitnessVenue>): List<FitnessVenue> {
@@ -811,7 +968,7 @@ private fun buildFitnessCards(
     val fallbacks = listOf(
         FitnessCardData(
             title = "Gym",
-            subtitle = "Build Your Strength",
+            subtitle = "Build your power",
             imageUrl = "",
             variant = FitnessCardVariant.HERO_LEFT,
             localImageResId = R.drawable.fitness_hero_gym
