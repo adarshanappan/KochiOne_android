@@ -251,6 +251,7 @@ fun PlayView(
                 if (detailVenues.isNotEmpty()) {
                     PlayVenueFullScreenSheet(
                         venues = detailVenues,
+                        isDarkTheme = isDarkTheme,
                         onVenueClick = { venue -> selectedVenue = venue }
                     )
                 } else {
@@ -440,6 +441,7 @@ private fun PlayFeatureCard(
 @Composable
 private fun PlayVenueFullScreenSheet(
     venues: List<PlayVenue>,
+    isDarkTheme: Boolean,
     onVenueClick: (PlayVenue) -> Unit
 ) {
     val context = LocalContext.current

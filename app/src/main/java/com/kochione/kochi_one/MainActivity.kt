@@ -136,14 +136,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val context = androidx.compose.ui.platform.LocalContext.current
-            var currentHour by remember { mutableIntStateOf(java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)) }
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                while (true) {
-                    currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-                    delay(60_000)
-                }
-            }
-            val isEveningTime = currentHour >= 18 || currentHour < 6
+            val systemDark = isSystemInDarkTheme()
             val prefs = remember { context.getSharedPreferences("kochi_one_prefs", android.content.Context.MODE_PRIVATE) }
             
             var selectedTheme by androidx.compose.runtime.saveable.rememberSaveable { 
@@ -153,7 +146,7 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(prefs.getBoolean("is_automatic", true)) 
             }
             
-            val isDarkTheme = if (isAutomatic) isEveningTime else (selectedTheme == "Dark")
+            val isDarkTheme = if (isAutomatic) systemDark else (selectedTheme == "Dark")
 
             // State for Circular Reveal
             var revealTargetDark by remember { mutableStateOf<Boolean?>(null) }
@@ -221,7 +214,7 @@ class MainActivity : ComponentActivity() {
                         },
                         isAutomatic = isAutomatic,
                         onAutomaticToggle = { it, offset -> 
-                            val nextDark = if (it) isEveningTime else (selectedTheme == "Dark")
+                            val nextDark = if (it) systemDark else (selectedTheme == "Dark")
                             if (nextDark != isDarkTheme) {
                                 // Trigger reveal
                                 revealOffset = offset ?: androidx.compose.ui.geometry.Offset.Zero
@@ -598,7 +591,10 @@ fun MainScreen(
                     zoomControlsEnabled = false // Clean UI
                 ),
                 properties = com.google.maps.android.compose.MapProperties(
-                    isMyLocationEnabled = hasLocationPermission
+                    isMyLocationEnabled = hasLocationPermission,
+                    mapStyleOptions = if (isDarkTheme) {
+                        com.google.android.gms.maps.model.MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_night)
+                    } else null
                 )
             ) {
                 // Drawing the Metro Line only when Transit tab is active
@@ -1502,23 +1498,23 @@ fun ThreeStateBottomSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore") {
+                NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore", isDarkTheme) {
                     onTabSelected("Explore")
                     coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
                 }
-                NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food") {
+                NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food", isDarkTheme) {
                     onTabSelected("Food")
                     coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
                 }
-                NavItem(R.drawable.ic_play, "Play", selectedTab == "Play") {
+                NavItem(R.drawable.ic_play, "Play", selectedTab == "Play", isDarkTheme) {
                     onTabSelected("Play")
                     coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
                 }
-                NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness") {
+                NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness", isDarkTheme) {
                     onTabSelected("Fitness")
                     coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
                 }
-                NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit") {
+                NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit", isDarkTheme) {
                     onTabSelected("Transit")
                     coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
                 }

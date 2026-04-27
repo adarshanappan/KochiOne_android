@@ -191,13 +191,13 @@ fun ProfileView(
                 ) {
                     Column {
                         Text(
-                            text = "Schedule",
+                            text = "Automatic",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = textColor
                         )
                         Text(
-                            text = "Sunset to Sunrise (6 PM - 6 AM)",
+                            text = "Follow device appearance",
                             style = MaterialTheme.typography.bodySmall,
                             color = secondaryTextColor
                         )

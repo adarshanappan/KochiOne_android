@@ -3,7 +3,6 @@ package com.kochione.kochi_one.views
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -55,11 +54,11 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
-import com.kochione.kochi_one.ui.components.SkeletonBox
 import com.kochione.kochi_one.models.DayHours
 import com.kochione.kochi_one.models.FitnessVenue
 import com.kochione.kochi_one.models.OperatingHours
 import com.kochione.kochi_one.models.Restaurant
+import com.kochione.kochi_one.ui.components.SkeletonBox
 import com.kochione.kochi_one.utils.KochiLinkType
 import com.kochione.kochi_one.utils.buildKochiDeepLink
 import com.kochione.kochi_one.viewmodels.FitnessViewModel
@@ -208,6 +207,7 @@ fun FitnessView(
             if (detailVenues.isNotEmpty()) {
                 FitnessVenueFullScreenSheet(
                     venues = detailVenues,
+                    isDarkTheme = isDarkTheme,
                     onVenueClick = { venue -> selectedVenue = venue }
                 )
             } else {
@@ -577,6 +577,7 @@ private fun FitnessVenueEmptyFullScreenSheet(
 @Composable
 private fun FitnessVenueFullScreenSheet(
     venues: List<FitnessVenue>,
+    isDarkTheme: Boolean,
     onVenueClick: (FitnessVenue) -> Unit
 ) {
     val context = LocalContext.current

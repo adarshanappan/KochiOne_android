@@ -423,7 +423,7 @@ private fun FoodDetailGallerySection(
     onSelectedIndexChange: (Int) -> Unit,
     onRequestFullGallery: () -> Unit
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
+    // val isDarkTheme = isSystemInDarkTheme() // Shadowing removed
     val selectedThumbBorderColor = if (isDarkTheme) Color.White else Color.Black
     Column(
         modifier = Modifier
@@ -664,8 +664,7 @@ private fun Modifier.galleryHorizontalPageSwipe(
 }
 
 @Composable
-private fun FoodDetailStatsRow(restaurant: Restaurant) {
-    val isDarkTheme = isSystemInDarkTheme()
+private fun FoodDetailStatsRow(restaurant: Restaurant, isDarkTheme: Boolean) {
     val panelBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFFFFFFF)
     val primaryText = if (isDarkTheme) Color.White else Color(0xFF111418)
     val secondaryText = if (isDarkTheme) Color(0xFF9EA3AE) else Color(0xFF6B7280)
@@ -738,7 +737,6 @@ private fun FoodDetailStatsRow(restaurant: Restaurant) {
 @Composable
 private fun FoodDetailInfoSection(restaurant: Restaurant, isDarkTheme: Boolean) {
     val context = LocalContext.current
-    val isDarkTheme = isSystemInDarkTheme()
     val cardBg = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFFFFFFF)
     val primaryText = if (isDarkTheme) Color.White else Color(0xFF111418)
     val buttonBorder = if (isDarkTheme) Color(0xFF60656D) else Color(0xFFD0D4DB)
@@ -750,7 +748,7 @@ private fun FoodDetailInfoSection(restaurant: Restaurant, isDarkTheme: Boolean) 
             .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
         if (restaurant.cuisine.isNotEmpty()) {
-            SectionTitle("Cuisine")
+            SectionTitle("Cuisine", isDarkTheme)
             Spacer(modifier = Modifier.height(12.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 items(restaurant.cuisine) { item ->
@@ -773,7 +771,7 @@ private fun FoodDetailInfoSection(restaurant: Restaurant, isDarkTheme: Boolean) 
 
             Spacer(modifier = Modifier.height(22.dp))
         }
-        SectionTitle("Features")
+        SectionTitle("Features", isDarkTheme)
         Spacer(modifier = Modifier.height(10.dp))
         val features = restaurant.features.ifEmpty { listOf("No features available") }
         features.forEachIndexed { index, feature ->
