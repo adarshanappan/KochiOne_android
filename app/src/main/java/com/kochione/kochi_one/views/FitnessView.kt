@@ -716,45 +716,104 @@ private fun FitnessVenueFullScreenSheet(
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        val coverUrls = venue.coverImages
+                        val displayedCoverUrls = venue.coverImages
                             ?.mapNotNull { img -> img.url.takeIf { it.isNotBlank() } }
                             .orEmpty()
-                        val maxOuterCoverImages = 4
-                        val displayedCoverUrls = coverUrls.take(maxOuterCoverImages)
+                            .take(4)
+                        val imageSlotBg = Color.Transparent
                         if (displayedCoverUrls.isNotEmpty()) {
-                            if (displayedCoverUrls.size == 1) {
-                                AsyncImage(
-                                    model = displayedCoverUrls[0],
-                                    contentDescription = venue.name,
-                                    modifier = Modifier
-                                        .fillMaxWidth(0.52f)
-                                        .height(110.dp)
-                                        .clip(RoundedCornerShape(14.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
+                            if (displayedCoverUrls.size == 2) {
+                                Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                                    AsyncImage(
+                                        model = displayedCoverUrls[0],
+                                        contentDescription = venue.name,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(16.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    AsyncImage(
+                                        model = displayedCoverUrls[1],
+                                        contentDescription = venue.name,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .clip(RoundedCornerShape(16.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
                             } else {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    displayedCoverUrls.chunked(2).forEach { rowUrls ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 4.dp, bottomEnd = 4.dp))
+                                                .background(imageSlotBg)
                                         ) {
-                                            rowUrls.forEach { url ->
+                                            if (displayedCoverUrls.isNotEmpty()) {
                                                 AsyncImage(
-                                                    model = url,
+                                                    model = displayedCoverUrls[0],
                                                     contentDescription = venue.name,
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(120.dp)
-                                                        .clip(RoundedCornerShape(14.dp)),
+                                                    modifier = Modifier.fillMaxSize(),
                                                     contentScale = ContentScale.Crop
                                                 )
                                             }
-                                            if (rowUrls.size == 1) {
-                                                Spacer(modifier = Modifier.weight(1f))
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp))
+                                                .background(imageSlotBg)
+                                        ) {
+                                            if (displayedCoverUrls.size > 1) {
+                                                AsyncImage(
+                                                    model = displayedCoverUrls[1],
+                                                    contentDescription = venue.name,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 4.dp))
+                                                .background(imageSlotBg)
+                                        ) {
+                                            if (displayedCoverUrls.size > 2) {
+                                                AsyncImage(
+                                                    model = displayedCoverUrls[2],
+                                                    contentDescription = venue.name,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 4.dp, bottomEnd = 16.dp))
+                                                .background(imageSlotBg)
+                                        ) {
+                                            if (displayedCoverUrls.size > 3) {
+                                                AsyncImage(
+                                                    model = displayedCoverUrls[3],
+                                                    contentDescription = venue.name,
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
                                             }
                                         }
                                     }
