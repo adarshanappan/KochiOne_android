@@ -212,7 +212,10 @@ fun FoodView(isDarkTheme: Boolean, viewModel: FoodViewModel = viewModel()) {
                                     if (isSelected) activeTabBgBase else Color.Transparent,
                                     RoundedCornerShape(22.dp)
                                 )
-                                .clickable { selectedCategory = category }
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = null
+                                ) { selectedCategory = category }
                                 .padding(horizontal = 16.dp, vertical = 10.dp)
                         ) {
                             Text(

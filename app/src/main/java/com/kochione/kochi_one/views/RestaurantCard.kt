@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -240,61 +241,106 @@ fun RestaurantCard(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Grid of 4 Images (Assuming top 4 images fit the 2x2 grid)
+        // Grid of 4 images (keeps alignment stable even if some images are missing)
         val displayImages = restaurant.coverImages.take(4)
+        val imageSlotBg = Color.Transparent
         if (displayImages.isNotEmpty()) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Top Row
+            if (displayImages.size == 2) {
                 Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-                    if (displayImages.isNotEmpty()) {
-                        AsyncImage(
-                            model = displayImages[0].url,
-                            contentDescription = "Cover Image 1",
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 4.dp, bottomEnd = 4.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
+                    AsyncImage(
+                        model = displayImages[0].url,
+                        contentDescription = "Cover Image 1",
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Crop
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    if (displayImages.size > 1) {
-                        AsyncImage(
-                            model = displayImages[1].url,
-                            contentDescription = "Cover Image 2",
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
+                    AsyncImage(
+                        model = displayImages[1].url,
+                        contentDescription = "Cover Image 2",
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Crop
+                    )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                // Bottom Row
-                Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-                    if (displayImages.size > 2) {
-                        AsyncImage(
-                            model = displayImages[2].url,
-                            contentDescription = "Cover Image 3",
+            } else {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Top Row
+                    Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 4.dp)),
-                            contentScale = ContentScale.Crop
-                        )
+                                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 4.dp, bottomEnd = 4.dp))
+                                .background(imageSlotBg)
+                        ) {
+                            if (displayImages.isNotEmpty()) {
+                                AsyncImage(
+                                    model = displayImages[0].url,
+                                    contentDescription = "Cover Image 1",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp))
+                                .background(imageSlotBg)
+                        ) {
+                            if (displayImages.size > 1) {
+                                AsyncImage(
+                                    model = displayImages[1].url,
+                                    contentDescription = "Cover Image 2",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    if (displayImages.size > 3) {
-                        AsyncImage(
-                            model = displayImages[3].url,
-                            contentDescription = "Cover Image 4",
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // Bottom Row
+                    Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 4.dp, bottomEnd = 16.dp)),
-                            contentScale = ContentScale.Crop
-                        )
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 4.dp))
+                                .background(imageSlotBg)
+                        ) {
+                            if (displayImages.size > 2) {
+                                AsyncImage(
+                                    model = displayImages[2].url,
+                                    contentDescription = "Cover Image 3",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 4.dp, bottomEnd = 16.dp))
+                                .background(imageSlotBg)
+                        ) {
+                            if (displayImages.size > 3) {
+                                AsyncImage(
+                                    model = displayImages[3].url,
+                                    contentDescription = "Cover Image 4",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
                     }
                 }
             }
