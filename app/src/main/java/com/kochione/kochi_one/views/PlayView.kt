@@ -77,6 +77,10 @@ import com.kochione.kochi_one.models.OperatingHours
 import com.kochione.kochi_one.models.PlayVenue
 import com.kochione.kochi_one.models.Restaurant
 import com.kochione.kochi_one.utils.KochiLinkType
+import com.kochione.kochi_one.utils.LikedSavedStore
+import com.kochione.kochi_one.utils.SavedBucket
+import com.kochione.kochi_one.utils.SavedItem
+import com.kochione.kochi_one.utils.SavedSection
 import com.kochione.kochi_one.utils.buildKochiDeepLink
 import com.kochione.kochi_one.viewmodels.PlayViewModel
 import java.util.Calendar
@@ -456,6 +460,12 @@ private fun PlayVenueFullScreenSheet(
     val dividerColor = if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.10f)
     val likedMap = remember { mutableStateMapOf<String, Boolean>() }
     val savedMap = remember { mutableStateMapOf<String, Boolean>() }
+    LaunchedEffect(venues) {
+        venues.forEach { venue ->
+            likedMap[venue.id] = LikedSavedStore.isInBucket(context, SavedBucket.LIKED, SavedSection.PLAY, venue.id)
+            savedMap[venue.id] = LikedSavedStore.isInBucket(context, SavedBucket.SAVED, SavedSection.PLAY, venue.id)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -712,7 +722,30 @@ private fun PlayVenueFullScreenSheet(
                                 activateScale = 1.3f,
                                 activateDurationMs = 150,
                                 resetDurationMs = 150,
-                                onClick = { likedMap[venue.id] = !liked }
+                                onClick = {
+                                    val next = !liked
+                                    likedMap[venue.id] = next
+                                    LikedSavedStore.setInBucket(
+                                        context = context,
+                                        bucket = SavedBucket.LIKED,
+                                        item = SavedItem(
+                                            id = venue.id,
+                                            section = SavedSection.PLAY,
+                                            title = venue.name,
+                                            subtitle = venue.playCategory.orEmpty(),
+                                            description = venue.description,
+                                            imageUrl = venue.coverImages?.firstOrNull()?.url
+                                                ?: venue.logo?.url
+                                                ?: "",
+                                            logoUrl = venue.logo?.url,
+                                            galleryImages = venue.coverImages?.mapNotNull { it.url.takeIf { u -> u.isNotBlank() } }.orEmpty(),
+                                            distanceLabel = "${"%.1f".format(venue.rating)} km",
+                                            statusLabel = statusText,
+                                            statusSuffix = statusSuffix
+                                        ),
+                                        enabled = next
+                                    )
+                                }
                             )
                             SheetActionIcon(
                                 iconRes = if (saved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
@@ -722,7 +755,30 @@ private fun PlayVenueFullScreenSheet(
                                 activateScale = 1.2f,
                                 activateDurationMs = 100,
                                 resetDurationMs = 100,
-                                onClick = { savedMap[venue.id] = !saved }
+                                onClick = {
+                                    val next = !saved
+                                    savedMap[venue.id] = next
+                                    LikedSavedStore.setInBucket(
+                                        context = context,
+                                        bucket = SavedBucket.SAVED,
+                                        item = SavedItem(
+                                            id = venue.id,
+                                            section = SavedSection.PLAY,
+                                            title = venue.name,
+                                            subtitle = venue.playCategory.orEmpty(),
+                                            description = venue.description,
+                                            imageUrl = venue.coverImages?.firstOrNull()?.url
+                                                ?: venue.logo?.url
+                                                ?: "",
+                                            logoUrl = venue.logo?.url,
+                                            galleryImages = venue.coverImages?.mapNotNull { it.url.takeIf { u -> u.isNotBlank() } }.orEmpty(),
+                                            distanceLabel = "${"%.1f".format(venue.rating)} km",
+                                            statusLabel = statusText,
+                                            statusSuffix = statusSuffix
+                                        ),
+                                        enabled = next
+                                    )
+                                }
                             )
                             SheetActionIcon(
                                 iconRes = R.drawable.ic_share,
@@ -997,7 +1053,7 @@ private fun FunActivitiesActionRow() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Star,
+                    painter = painterResource(id = R.drawable.ic_star_new),
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(18.dp)

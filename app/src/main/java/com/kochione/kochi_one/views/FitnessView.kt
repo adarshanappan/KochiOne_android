@@ -60,6 +60,10 @@ import com.kochione.kochi_one.models.OperatingHours
 import com.kochione.kochi_one.models.Restaurant
 import com.kochione.kochi_one.ui.components.SkeletonBox
 import com.kochione.kochi_one.utils.KochiLinkType
+import com.kochione.kochi_one.utils.LikedSavedStore
+import com.kochione.kochi_one.utils.SavedBucket
+import com.kochione.kochi_one.utils.SavedItem
+import com.kochione.kochi_one.utils.SavedSection
 import com.kochione.kochi_one.utils.buildKochiDeepLink
 import com.kochione.kochi_one.viewmodels.FitnessViewModel
 import java.util.Calendar
@@ -592,6 +596,12 @@ private fun FitnessVenueFullScreenSheet(
     val dividerColor = if (isDarkTheme) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.10f)
     val likedMap = remember { mutableStateMapOf<String, Boolean>() }
     val savedMap = remember { mutableStateMapOf<String, Boolean>() }
+    LaunchedEffect(venues) {
+        venues.forEach { venue ->
+            likedMap[venue.id] = LikedSavedStore.isInBucket(context, SavedBucket.LIKED, SavedSection.FITNESS, venue.id)
+            savedMap[venue.id] = LikedSavedStore.isInBucket(context, SavedBucket.SAVED, SavedSection.FITNESS, venue.id)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -846,7 +856,30 @@ private fun FitnessVenueFullScreenSheet(
                                 activateScale = 1.3f,
                                 activateDurationMs = 150,
                                 resetDurationMs = 150,
-                                onClick = { likedMap[venue.id] = !liked }
+                                onClick = {
+                                    val next = !liked
+                                    likedMap[venue.id] = next
+                                    LikedSavedStore.setInBucket(
+                                        context = context,
+                                        bucket = SavedBucket.LIKED,
+                                        item = SavedItem(
+                                            id = venue.id,
+                                            section = SavedSection.FITNESS,
+                                            title = venue.name,
+                                            subtitle = venue.fitnessCategory.orEmpty(),
+                                            description = venue.description,
+                                            imageUrl = venue.coverImages?.firstOrNull()?.url
+                                                ?: venue.logo?.url
+                                                ?: "",
+                                            logoUrl = venue.logo?.url,
+                                            galleryImages = venue.coverImages?.mapNotNull { it.url.takeIf { u -> u.isNotBlank() } }.orEmpty(),
+                                            distanceLabel = "${"%.1f".format(venue.rating)} km",
+                                            statusLabel = statusText,
+                                            statusSuffix = statusSuffix
+                                        ),
+                                        enabled = next
+                                    )
+                                }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = if (saved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
@@ -856,7 +889,30 @@ private fun FitnessVenueFullScreenSheet(
                                 activateScale = 1.2f,
                                 activateDurationMs = 100,
                                 resetDurationMs = 100,
-                                onClick = { savedMap[venue.id] = !saved }
+                                onClick = {
+                                    val next = !saved
+                                    savedMap[venue.id] = next
+                                    LikedSavedStore.setInBucket(
+                                        context = context,
+                                        bucket = SavedBucket.SAVED,
+                                        item = SavedItem(
+                                            id = venue.id,
+                                            section = SavedSection.FITNESS,
+                                            title = venue.name,
+                                            subtitle = venue.fitnessCategory.orEmpty(),
+                                            description = venue.description,
+                                            imageUrl = venue.coverImages?.firstOrNull()?.url
+                                                ?: venue.logo?.url
+                                                ?: "",
+                                            logoUrl = venue.logo?.url,
+                                            galleryImages = venue.coverImages?.mapNotNull { it.url.takeIf { u -> u.isNotBlank() } }.orEmpty(),
+                                            distanceLabel = "${"%.1f".format(venue.rating)} km",
+                                            statusLabel = statusText,
+                                            statusSuffix = statusSuffix
+                                        ),
+                                        enabled = next
+                                    )
+                                }
                             )
                             FitnessSheetActionIcon(
                                 iconRes = R.drawable.ic_share,
@@ -1012,7 +1068,8 @@ private fun buildFitnessDetailVenuesForCard(card: FitnessCardData, allVenues: Li
         FitnessCardVariant.STACK_TOP -> listOf("yoga")
         FitnessCardVariant.STACK_BOTTOM -> listOf("mma", "boxing", "fight", "martial")
         FitnessCardVariant.FULL_CENTRE -> listOf("fitness", "center", "centre", "studio")
-        FitnessCardVariant.FULL_HEALTH -> listOf("club", "health", "wellness")
+        // Mirroring Fitness Centre keys for Health Clubs as requested so details are the same
+        FitnessCardVariant.FULL_HEALTH -> listOf("club", "health", "wellness", "fitness", "center", "centre", "studio")
     }
     val filtered = allVenues.filter { venue ->
         val n = venue.name.lowercase()
@@ -1083,7 +1140,8 @@ private fun buildFitnessCards(
         thumbnailFor("yoga"),
         thumbnailFor("mma", "boxing", "martial", "fight"),
         thumbnailFor("fitness centre", "fitness center", "fitness", "studio"),
-        thumbnailFor("health club", "wellness", "health")
+        // Mirroring Fitness Centre keys so the cover image updates together
+        thumbnailFor("health club", "wellness", "health", "fitness centre", "fitness center", "fitness", "studio")
     )
 
     if (venues.isEmpty()) {
@@ -1116,7 +1174,7 @@ private fun buildFitnessCards(
         takeFirstMatch(listOf("yoga")),
         takeFirstMatch(listOf("mma", "boxing", "fight", "martial")),
         takeFirstMatch(listOf("fitness", "center", "centre", "studio")),
-        takeFirstMatch(listOf("club", "health", "wellness"))
+        takeFirstMatch(listOf("club", "health", "wellness", "fitness", "center", "centre", "studio"))
     )
 
     val rest = venues.filter { it.id !in usedIds }

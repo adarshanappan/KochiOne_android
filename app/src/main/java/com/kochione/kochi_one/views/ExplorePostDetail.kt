@@ -19,6 +19,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,9 +32,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Arrangement
 import coil.compose.AsyncImage
 import com.kochione.kochi_one.models.ExploreContentBlock
 import com.kochione.kochi_one.models.ExploreContentParser
@@ -44,11 +49,9 @@ fun ExplorePostDetail(post: ExplorePost, isDarkTheme: Boolean, onClose: () -> Un
     val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val textColor = if (isDarkTheme) Color.White else Color.Black
     val subtleTextColor = if (isDarkTheme) Color.LightGray else Color.DarkGray
+    val uriHandler = LocalUriHandler.current
     
     val scrollState = rememberScrollState()
-    // Calculate alpha for sticky header based on scroll (max at 400px equivalent scroll)
-    val headerAlpha = (scrollState.value / 400f).coerceIn(0f, 1f)
-    val headerBgColor = bgColor.copy(alpha = headerAlpha)
     
     Box(
         modifier = Modifier
@@ -85,16 +88,16 @@ fun ExplorePostDetail(post: ExplorePost, isDarkTheme: Boolean, onClose: () -> Un
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
-                                startY = 400f
+                                colors = listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent),
+                                endY = 400f
                             )
                         )
                 )
 
-                // Text at bottom left of image
+                // Text at top left of image
                 Column(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
+                        .align(Alignment.TopStart)
                         .padding(24.dp)
                 ) {
                     if (post.eyebrow.isNotEmpty()) {
@@ -121,71 +124,80 @@ fun ExplorePostDetail(post: ExplorePost, isDarkTheme: Boolean, onClose: () -> Un
                     .fillMaxWidth()
                     .padding(24.dp)
             ) {
-                if (post.accountName.isNotEmpty()) {
-                    Text(
-                        text = post.accountName.uppercase(),
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.labelMedium,
-                        letterSpacing = 1.sp
-                    )
-                }
-                
-                Text(
-                    text = post.title,
-                    color = textColor,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    if (post.description.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (post.accountName.isNotEmpty()) {
+                            Text(
+                                text = post.accountName.uppercase(),
+                                color = Color.Gray,
+                                style = MaterialTheme.typography.labelMedium,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                        
                         Text(
-                            text = post.description,
-                            color = subtleTextColor,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
+                            text = post.title,
+                            color = textColor,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
                         )
+                        
+                        if (post.description.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = post.description,
+                                color = subtleTextColor,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 2,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    // Account Logo and Arrow Button
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(start = 8.dp)
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (post.accountLogoUrl.isNotEmpty()) {
                             AsyncImage(
                                 model = post.accountLogoUrl,
                                 contentDescription = "Logo",
                                 modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(8.dp))
                                     .shimmerEffect(isDarkTheme),
                                 contentScale = ContentScale.Crop
                             )
+                            Spacer(modifier = Modifier.width(12.dp))
                         }
                         
-                        Spacer(modifier = Modifier.width(12.dp))
-                        
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(if (isDarkTheme) Color(0xFF333333) else Color(0xFFF0F0F0))
-                                .clickable { /* action */ },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = post.buttonLabel,
-                                tint = textColor
-                            )
+                        if (post.redirectUrl.isNotBlank() && post.redirectUrl != "null") {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isDarkTheme) Color(0xFF333333) else Color(0xFFF0F0F0))
+                                    .clickable {
+                                        try {
+                                            uriHandler.openUri(post.redirectUrl)
+                                        } catch (e: Exception) {
+                                            // Ignore if URL is invalid
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = post.buttonLabel,
+                                    tint = textColor
+                                )
+                            }
                         }
                     }
                 }
@@ -200,6 +212,64 @@ fun ExplorePostDetail(post: ExplorePost, isDarkTheme: Boolean, onClose: () -> Un
                 contentBlocks.forEach { block ->
                     RenderContentBlock(block, textColor)
                     Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                if (post.galleryImages.isNotEmpty()) {
+                    post.galleryImages.forEach { galleryImage ->
+                        if (galleryImage.url.isNotBlank()) {
+                            AsyncImage(
+                                model = galleryImage.url,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(260.dp)
+                                    .clip(RoundedCornerShape(16.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
+                }
+
+                val displayButtonLabel = post.buttonLabel.ifEmpty { "Learn More" }
+
+                if (post.redirectUrl.isNotBlank() && post.redirectUrl != "null") {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            try {
+                                uriHandler.openUri(post.redirectUrl)
+                            } catch (e: Exception) {
+                                // Ignore if URL is invalid
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isDarkTheme) Color(0xFF333333) else Color(0xFFF0F0F0),
+                            contentColor = textColor
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = displayButtonLabel,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }

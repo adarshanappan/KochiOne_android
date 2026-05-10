@@ -14,6 +14,7 @@ data class PlayVenue(
     val ranking: Int,
     val playCategory: String,
     val logo: RestaurantLogo?,
+    @SerializedName(value = "coverImages", alternate = ["cover_images"])
     val coverImages: List<RestaurantImage>?,
     val operatingHours: OperatingHours,
     val features: List<String>,

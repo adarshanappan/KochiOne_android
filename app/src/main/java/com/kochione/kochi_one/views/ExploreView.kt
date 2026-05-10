@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -239,13 +240,19 @@ fun ExploreSummaryCard(
     subtleTextColor: Color, 
     onClick: () -> Unit
 ) {
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(cardBgColor)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
     ) {
         Column {
             // Image Section
@@ -267,16 +274,16 @@ fun ExploreSummaryCard(
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
-                                startY = 150f
+                                colors = listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent),
+                                endY = 250f
                             )
                         )
                 )
                 
-                // Text at bottom left of image
+                // Text at top left of image
                 Column(
                     modifier = Modifier
-                        .align(Alignment.BottomStart)
+                        .align(Alignment.TopStart)
                         .padding(16.dp)
                 ) {
                     if (post.eyebrow.isNotEmpty()) {
@@ -302,20 +309,8 @@ fun ExploreSummaryCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Bottom
             ) {
-                if (post.accountLogoUrl.isNotEmpty()) {
-                    AsyncImage(
-                        model = post.accountLogoUrl,
-                        contentDescription = "Logo",
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                }
-                
                 Column(modifier = Modifier.weight(1f)) {
                     if (post.accountName.isNotEmpty()) {
                         Text(
@@ -327,32 +322,61 @@ fun ExploreSummaryCard(
                     Text(
                         text = post.title,
                         color = textColor,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     if (post.description.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = post.description,
                             color = subtleTextColor,
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
                 
-                Spacer(modifier = Modifier.width(12.dp))
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(if (isDarkTheme) Color(0xFF333333) else Color(0xFFF0F0F0)), 
-                    contentAlignment = Alignment.Center
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = post.buttonLabel,
-                        tint = textColor,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    if (post.accountLogoUrl.isNotEmpty()) {
+                        AsyncImage(
+                            model = post.accountLogoUrl,
+                            contentDescription = "Logo",
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    
+                    if (post.redirectUrl.isNotBlank() && post.redirectUrl != "null") {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(if (isDarkTheme) Color(0xFF333333) else Color(0xFFF0F0F0))
+                                .clickable {
+                                    try {
+                                        uriHandler.openUri(post.redirectUrl)
+                                    } catch (e: Exception) {
+                                        // Ignore
+                                    }
+                                }, 
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = post.buttonLabel.ifEmpty { "Learn More" },
+                                tint = textColor,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

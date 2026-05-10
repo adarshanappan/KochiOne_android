@@ -6,7 +6,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +25,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -218,12 +218,33 @@ fun FoodView(isDarkTheme: Boolean, viewModel: FoodViewModel = viewModel()) {
                                 ) { selectedCategory = category }
                                 .padding(horizontal = 16.dp, vertical = 10.dp)
                         ) {
-                            Text(
-                                text = category,
-                                color = if (isSelected) Color.White else inactiveTextColor,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val iconMod = Modifier.size(16.dp)
+                                val iconTint = if (isSelected) Color.White else inactiveTextColor
+                                var hasIcon = true
+                                
+                                when (category) {
+                                    "Trending" -> Icon(painterResource(id = R.drawable.ic_trending), "Trending", modifier = iconMod, tint = iconTint)
+                                    "Restaurant" -> Icon(painterResource(id = R.drawable.ic_eat), "Restaurant", modifier = iconMod, tint = iconTint)
+                                    "Buffet & Fine Dining" -> Icon(Icons.Default.Star, "Buffet & Fine Dining", modifier = iconMod, tint = iconTint)
+                                    "Cafe" -> Icon(painterResource(id = R.drawable.ic_cafe), "Cafe", modifier = iconMod, tint = iconTint)
+                                    "Food Trucks" -> Icon(painterResource(id = R.drawable.ic_food_truck), "Food Trucks", modifier = iconMod, tint = iconTint)
+                                    "Restobar" -> Icon(painterResource(id = R.drawable.ic_restobar), "Restobar", modifier = iconMod, tint = iconTint)
+                                    "Juice & Shake" -> Icon(painterResource(id = R.drawable.ic_juice), "Juice & Shake", modifier = iconMod, tint = iconTint)
+                                    "Bakeries and Dessert" -> Icon(painterResource(id = R.drawable.ic_bakery), "Bakeries and Dessert", modifier = iconMod, tint = iconTint)
+                                    else -> { hasIcon = false }
+                                }
+                                
+                                if (hasIcon) {
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                }
+                                Text(
+                                    text = category,
+                                    color = if (isSelected) Color.White else inactiveTextColor,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }

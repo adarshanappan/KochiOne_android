@@ -1,14 +1,14 @@
 package com.kochione.kochi_one.api
 
-import java.util.concurrent.TimeUnit
 import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     // Placeholder Base URL, adjust this to your actual production/staging API server
-    private const val BASE_URL = "https://admin.kochi.one/api/"
+    private const val BASE_URL = "https://api.kochi.one/api/"
 
     /** One client for all services: connection reuse + HTTP/2 to same host (faster than new handshakes per call). */
     private val okHttpClient: OkHttpClient by lazy {

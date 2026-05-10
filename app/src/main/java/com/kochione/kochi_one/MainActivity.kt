@@ -23,7 +23,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,9 +36,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -49,22 +52,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,12 +67,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -85,6 +84,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -103,7 +103,6 @@ import com.google.android.gms.location.LocationSettingsResponse
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.tasks.Task
 import com.google.maps.android.compose.GoogleMap
@@ -115,19 +114,36 @@ import com.kochione.kochi_one.models.ExplorePost
 import com.kochione.kochi_one.transit.Metro.TrainSimulator
 import com.kochione.kochi_one.transit.Metro.data.KmrlOpenData
 import com.kochione.kochi_one.ui.theme.KochiOneTheme
+import com.kochione.kochi_one.utils.SavedBucket
 import com.kochione.kochi_one.viewmodels.FoodViewModel
 import com.kochione.kochi_one.viewmodels.PlayViewModel
 import com.kochione.kochi_one.viewmodels.TransitViewModel
+import com.kochione.kochi_one.views.AboutView
+import com.kochione.kochi_one.views.ChatView
 import com.kochione.kochi_one.views.ExploreView
 import com.kochione.kochi_one.views.FitnessView
 import com.kochione.kochi_one.views.FoodView
+import com.kochione.kochi_one.views.HelpView
+import com.kochione.kochi_one.views.LikedSavedItemsView
 import com.kochione.kochi_one.views.PlayView
 import com.kochione.kochi_one.views.ProfileEditView
 import com.kochione.kochi_one.views.ProfileView
+import com.kochione.kochi_one.views.ReportView
 import com.kochione.kochi_one.views.TransitView
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlin.math.abs
+
+private const val OPENAI_API_KEY =
+    "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"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -167,11 +183,14 @@ class MainActivity : ComponentActivity() {
             val configuration = LocalConfiguration.current
             val density = LocalDensity.current
             val screenHeightDp = configuration.screenHeightDp.dp
-            val expandedHeightPx = with(density) { (screenHeightDp * 0.95f).toPx() }
-            val halfExpandedHeightPx = with(density) { (screenHeightDp * 0.6f).toPx() }
-            val collapsedHeightPx = with(density) { 200.dp.toPx() }
+            // Compute sheet heights once per screen size change to avoid recomposition shifts
+            val expandedHeightPx = remember(screenHeightDp) { with(density) { (screenHeightDp * 0.95f).toPx() } }
+            val halfExpandedHeightPx = remember(screenHeightDp) { with(density) { (screenHeightDp * 0.6f).toPx() } }
+            val collapsedHeightPx = remember { with(density) { 200.dp.toPx() } }
 
             var selectedTab by remember { mutableStateOf("Explore") }
+
+            var chatInitialMessage by remember { mutableStateOf<String?>(null) }
             val sheetHeightPx = remember { androidx.compose.animation.core.Animatable(collapsedHeightPx) }
             var activeExplorePost by remember { mutableStateOf<ExplorePost?>(null) }
             var playOrFitnessDetailOpen by remember { mutableStateOf(false) }
@@ -202,7 +221,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 scope.launch {
                                     revealProgress.snapTo(0f)
-                                    revealProgress.animateTo(1f, androidx.compose.animation.core.tween(1500))
+                                    revealProgress.animateTo(1f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                                     // Update actual state after animation
                                     selectedTheme = newTheme
                                     isAutomatic = false 
@@ -210,6 +229,12 @@ class MainActivity : ComponentActivity() {
                                     revealTargetDark = null
                                     revealProgress.snapTo(0f)
                                 }
+                            } else {
+                                // Same effective theme — no animation, but still lock in
+                                // the explicit selection and disable automatic mode
+                                selectedTheme = newTheme
+                                isAutomatic = false
+                                prefs.edit().putString("selected_theme", newTheme).putBoolean("is_automatic", false).apply()
                             }
                         },
                         isAutomatic = isAutomatic,
@@ -224,7 +249,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 scope.launch {
                                     revealProgress.snapTo(0f)
-                                    revealProgress.animateTo(1f, androidx.compose.animation.core.tween(1500))
+                                    revealProgress.animateTo(1f, androidx.compose.animation.core.tween(1100, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                                     isAutomatic = it
                                     prefs.edit().putBoolean("is_automatic", it).apply()
                                     revealTargetDark = null
@@ -237,6 +262,8 @@ class MainActivity : ComponentActivity() {
                         },
                         selectedTab = selectedTab,
                         onTabSelected = { selectedTab = it },
+                        chatInitialMessage = chatInitialMessage,
+                        onChatInitialMessageChanged = { chatInitialMessage = it },
                         sheetHeightPx = sheetHeightPx,
                         expandedHeightPx = expandedHeightPx,
                         halfExpandedHeightPx = halfExpandedHeightPx,
@@ -290,6 +317,8 @@ class MainActivity : ComponentActivity() {
                                 onAutomaticToggle = { _, _ -> },
                                 selectedTab = selectedTab,
                                 onTabSelected = { selectedTab = it },
+                                chatInitialMessage = chatInitialMessage,
+                                onChatInitialMessageChanged = { chatInitialMessage = it },
                                 sheetHeightPx = sheetHeightPx,
                                 expandedHeightPx = expandedHeightPx,
                                 halfExpandedHeightPx = halfExpandedHeightPx,
@@ -305,6 +334,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+
+
             }
         }
     }
@@ -319,6 +350,8 @@ fun MainScreen(
     onAutomaticToggle: (Boolean, androidx.compose.ui.geometry.Offset?) -> Unit,
     selectedTab: String,
     onTabSelected: (String) -> Unit,
+    chatInitialMessage: String?,
+    onChatInitialMessageChanged: (String?) -> Unit,
     sheetHeightPx: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
     expandedHeightPx: Float,
     halfExpandedHeightPx: Float,
@@ -347,7 +380,13 @@ fun MainScreen(
         KmrlOpenData.load(context)
     }
 
-    // Theme logic moved to setContent
+    // Time-based theme: morning (6:00 AM – 6:30 PM) = light map + dark sheet, night = dark everything
+    val calendar = java.util.Calendar.getInstance()
+    val currentHour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+    val currentMinute = calendar.get(java.util.Calendar.MINUTE)
+    val isMorningTime = currentHour in 6..17 || (currentHour == 18 && currentMinute < 30) // 6:00 AM to 6:29 PM
+    val mapIsDark = if (isAutomatic) !isMorningTime else isDarkTheme
+    val sheetIsDark = if (isAutomatic) true else isDarkTheme
 
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -408,13 +447,13 @@ fun MainScreen(
                 Text(
                     text = "Location Access", 
                     fontWeight = FontWeight.Bold,
-                    color = if (isDarkTheme) Color.White else Color.Black
+                    color = if (sheetIsDark) Color.White else Color.Black
                 ) 
             },
             text = { 
                 Text(
                     text = stringResource(R.string.location_rationale_description),
-                    color = (if (isDarkTheme) Color.White else Color.Black).copy(alpha = 0.8f)
+                    color = (if (sheetIsDark) Color.White else Color.Black).copy(alpha = 0.8f)
                 ) 
             },
             confirmButton = {
@@ -437,7 +476,7 @@ fun MainScreen(
                     Text("Not now", color = Color.Gray)
                 }
             },
-            containerColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White,
+            containerColor = if (sheetIsDark) Color(0xFF1E1E1E) else Color.White,
             shape = RoundedCornerShape(24.dp)
         )
     }
@@ -449,13 +488,13 @@ fun MainScreen(
                 Text(
                     text = "Camera Access",
                     fontWeight = FontWeight.Bold,
-                    color = if (isDarkTheme) Color.White else Color.Black
+                    color = if (sheetIsDark) Color.White else Color.Black
                 )
             },
             text = {
                 Text(
                     text = stringResource(R.string.camera_rationale_description),
-                    color = (if (isDarkTheme) Color.White else Color.Black).copy(alpha = 0.8f)
+                    color = (if (sheetIsDark) Color.White else Color.Black).copy(alpha = 0.8f)
                 )
             },
             confirmButton = {
@@ -473,14 +512,15 @@ fun MainScreen(
                     Text("Not now", color = Color.Gray)
                 }
             },
-            containerColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White,
+            containerColor = if (sheetIsDark) Color(0xFF1E1E1E) else Color.White,
             shape = RoundedCornerShape(24.dp)
         )
     }
 
-    val currentSheetHeightDp = with(density) { sheetHeightPx.value.toDp() }
     // Capsule starts disappearing when sheet crosses 50% of the total height
-    val isSheetExpanded = sheetHeightPx.value > expandedHeightPx * 0.65f
+    val isSheetExpanded by remember(expandedHeightPx) { 
+        derivedStateOf { sheetHeightPx.value > expandedHeightPx * 0.65f }
+    }
 
 
 
@@ -494,7 +534,10 @@ fun MainScreen(
     val coroutineScope = rememberCoroutineScope()
 
     BackHandler {
-        if (sheetHeightPx.value > halfExpandedHeightPx + 20f) {
+        if (selectedTab == "Chat") {
+            onTabSelected("Explore")
+            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+        } else if (sheetHeightPx.value > halfExpandedHeightPx + 20f) {
             coroutineScope.launch {
                 sheetHeightPx.animateTo(halfExpandedHeightPx)
             }
@@ -586,13 +629,17 @@ fun MainScreen(
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
-                uiSettings = com.google.maps.android.compose.MapUiSettings(
-                    myLocationButtonEnabled = false,
-                    zoomControlsEnabled = false // Clean UI
-                ),
+                    uiSettings = com.google.maps.android.compose.MapUiSettings(
+                        myLocationButtonEnabled = true,
+                        zoomControlsEnabled = true, // Clean UI
+                        scrollGesturesEnabled = true,
+                        zoomGesturesEnabled = true,
+                        tiltGesturesEnabled = true,
+                        
+                    ),
                 properties = com.google.maps.android.compose.MapProperties(
                     isMyLocationEnabled = hasLocationPermission,
-                    mapStyleOptions = if (isDarkTheme) {
+                    mapStyleOptions = if (mapIsDark) {
                         com.google.android.gms.maps.model.MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style_night)
                     } else null
                 )
@@ -653,8 +700,8 @@ fun MainScreen(
                         val transitIcon = when {
                             isVeryZoomedOut -> verySmallIcon
                             isZoomedOut -> smallIcon
-                            else -> remember(station.name, isDarkTheme) {
-                                createMarkerWithLabel(context, R.drawable.ic_metro_stop_pin, station.name, isDarkTheme)
+                            else -> remember(station.name, mapIsDark) {
+                                createMarkerWithLabel(context, R.drawable.ic_metro_stop_pin, station.name, mapIsDark)
                             }
                         }
 
@@ -676,7 +723,7 @@ fun MainScreen(
                 if (selectedTab == "Food") {
                     restaurants.forEach { restaurant ->
                         val logoUrl = restaurant.logo?.url ?: restaurant.coverImages.firstOrNull()?.url
-                        val foodIcon = rememberRestaurantMarker(context, logoUrl, isDarkTheme)
+                        val foodIcon = rememberRestaurantMarker(context, logoUrl, mapIsDark)
                         
                         Marker(
                             state = MarkerState(position = LatLng(restaurant.location.latitude, restaurant.location.longitude)),
@@ -748,7 +795,7 @@ fun MainScreen(
             }
 
             // Translucent Gradient for Status Bar icon visibility
-            val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
+            val bgColor = if (mapIsDark) Color(0xFF1E1E1E) else Color.White
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -811,8 +858,9 @@ fun MainScreen(
                 visible = !isSheetExpanded,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    // Float the capsule above the sheet synchronously.
-                    .padding(end = 16.dp, bottom = currentSheetHeightDp + 20.dp),
+                    // Float the capsule above the sheet synchronously, avoiding composition phase reads
+                    .padding(end = 16.dp)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, -sheetHeightPx.value.toInt() - 20.dp.roundToPx()) },
                 enter = androidx.compose.animation.scaleIn(
                     initialScale = 0.8f,
                     animationSpec = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
@@ -826,9 +874,9 @@ fun MainScreen(
                     animationSpec = androidx.compose.animation.core.tween(500)
                 )
             ) {
-                val glassColor = if (isDarkTheme) Color(0xFF1E1E1E).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.7f)
-                val glassBorder = if (isDarkTheme) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.1f)
-                val iconTint = if (isDarkTheme) Color.White else Color.Black
+                val glassColor = if (sheetIsDark) Color(0xFF1E1E1E).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.7f)
+                val glassBorder = if (sheetIsDark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.1f)
+                val iconTint = if (sheetIsDark) Color.White else Color.Black
 
                 Box(
                     modifier = Modifier
@@ -976,7 +1024,7 @@ fun MainScreen(
                 selectedTab = selectedTab,
                 onTabSelected = onTabSelected,
                 transitViewModel = transitViewModel,
-                isDarkTheme = isDarkTheme,
+                isDarkTheme = sheetIsDark,
                 selectedTheme = selectedTheme,
                 onThemeSelected = onThemeSelected,
                 isAutomatic = isAutomatic,
@@ -987,6 +1035,8 @@ fun MainScreen(
                 onPlayOrFitnessDetailOpenChanged = onPlayOrFitnessDetailOpenChanged,
                 dismissPlayFitnessDetail = dismissPlayFitnessDetail,
                 onRegisterDismissDetail = onRegisterDismissDetail,
+                chatInitialMessage = chatInitialMessage,
+                onChatInitialMessageChanged = onChatInitialMessageChanged,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 
@@ -1088,7 +1138,7 @@ private fun createCircleMarker(context: Context, color: Color, sizeDp: Int): Bit
     return BitmapDescriptorFactory.fromBitmap(bitmap)
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun ThreeStateBottomSheet(
     sheetHeightPx: androidx.compose.animation.core.Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
@@ -1110,12 +1160,19 @@ fun ThreeStateBottomSheet(
     onPlayOrFitnessDetailOpenChanged: (Boolean) -> Unit,
     dismissPlayFitnessDetail: (() -> Unit)?,
     onRegisterDismissDetail: ((() -> Unit)?) -> Unit,
+    chatInitialMessage: String?,
+    onChatInitialMessageChanged: (String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
 
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
+
+    // isDarkTheme here = sheetIsDark (always dark when automatic).
+    // Compute the true effective theme for ProfileView (respects system + user choice).
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val effectiveIsDarkTheme = if (isAutomatic) systemDark else (selectedTheme == "Dark")
 
     // Using isDarkTheme parameter passed from parent
     val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
@@ -1125,14 +1182,122 @@ fun ThreeStateBottomSheet(
     val dragHandleColor = if (isDarkTheme) Color.Gray else Color.LightGray
     val navBarIconTint = if (isDarkTheme) Color.White else Color.Black
     val bottomNavReservedHeight = 72.dp
+
+    // ── AI-powered cycling suggestions ─────────────────────────────────────
+    val fallbackSuggestions = remember {
+        listOf(
+            "Best breakfast spots",
+            "Metro timings",
+            "Hidden gems in Kochi",
+            "Gyms near me",
+            "Things to do tonight",
+            "Fort Kochi walks",
+            "Best cafes",
+            "Backwater cruises"
+        )
+    }
+    var aiSuggestions by remember { mutableStateOf(fallbackSuggestions) }
+    var currentSuggestionIndex by remember { mutableStateOf(0) }
+    val suggestionAlpha = remember { Animatable(1f) }
+
+    LaunchedEffect(Unit) {
+        // 1. Fetch suggestions from OpenAI in background
+        try {
+            val fetched = withContext(Dispatchers.IO) {
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val reqJson = JSONObject().apply {
+                    put("model", "gpt-4o-mini")
+                    put("messages", JSONArray().apply {
+                        put(JSONObject().apply {
+                            put("role", "system")
+                            put("content", "You are a helpful assistant. Always respond with valid JSON only, no markdown, no code fences.")
+                        })
+                        put(JSONObject().apply {
+                            put("role", "user")
+                            put("content",
+                                "Generate 8 short search suggestions (2-4 words each) " +
+                                "for a Kochi city guide app covering food, fitness, " +
+                                "entertainment, beaches, cafes, transit. " +
+                                "Respond with ONLY a raw JSON array of strings like: " +
+                                "[\"suggestion1\",\"suggestion2\"]")
+                        })
+                    })
+                    put("max_tokens", 200)
+                    // Force JSON response on supported models
+                    put("response_format", JSONObject().apply { put("type", "json_object") })
+                }
+                val body = reqJson.toString()
+                    .toRequestBody("application/json".toMediaType())
+                val request = Request.Builder()
+                    .url("https://api.openai.com/v1/chat/completions")
+                    .addHeader("Authorization", "Bearer $OPENAI_API_KEY")
+                    .addHeader("Content-Type", "application/json")
+                    .post(body)
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val rawBody = response.body?.string() ?: return@use null
+                        val respJson = JSONObject(rawBody)
+                        val content = respJson
+                            .getJSONArray("choices")
+                            .getJSONObject(0)
+                            .getJSONObject("message")
+                            .getString("content")
+                            .trim()
+
+                        // Strip markdown code fences if present (```json ... ```)
+                        val cleaned = content
+                            .removePrefix("```json")
+                            .removePrefix("```")
+                            .removeSuffix("```")
+                            .trim()
+
+                        // Try to parse as JSON array directly
+                        val arr: JSONArray? = try {
+                            // If model returned {"suggestions": [...]} or similar wrapper
+                            if (cleaned.startsWith("{")) {
+                                val obj = JSONObject(cleaned)
+                                // Grab the first array value found
+                                obj.keys().asSequence()
+                                    .mapNotNull { key -> runCatching { obj.getJSONArray(key) }.getOrNull() }
+                                    .firstOrNull()
+                            } else {
+                                JSONArray(cleaned)
+                            }
+                        } catch (_: Exception) {
+                            // Last resort: regex-extract [...] block
+                            val match = Regex("\\[[^\\[\\]]+\\]").find(cleaned)
+                            match?.let { runCatching { JSONArray(it.value) }.getOrNull() }
+                        }
+
+                        arr?.let { a -> (0 until a.length()).map { a.getString(it) } }
+                    } else null
+                }
+            }
+            if (!fetched.isNullOrEmpty()) aiSuggestions = fetched
+        } catch (_: Exception) { /* keep fallback */ }
+
+        // 2. Cycle through suggestions with fade in/out every 3 seconds
+        while (true) {
+            delay(3000L)
+            suggestionAlpha.animateTo(0f, tween(350))
+            currentSuggestionIndex = (currentSuggestionIndex + 1) % aiSuggestions.size
+            suggestionAlpha.animateTo(1f, tween(350))
+        }
+    }
     
     // Calculate alpha for inner content based on sheet height
     // Fully visible (alpha 1f) at half expanded, fully hidden (alpha 0f) at collapsed
-    val contentAlpha = remember(sheetHeightPx.value, collapsedHeightPx, halfExpandedHeightPx) {
-        if (sheetHeightPx.value <= collapsedHeightPx) 0f
-        else {
-            val progress = (sheetHeightPx.value - collapsedHeightPx) / (halfExpandedHeightPx - collapsedHeightPx)
-            progress.coerceIn(0f, 1f)
+    val contentAlpha by remember(collapsedHeightPx, halfExpandedHeightPx) {
+        derivedStateOf {
+            if (sheetHeightPx.value <= collapsedHeightPx) 0f
+            else {
+                val progress = (sheetHeightPx.value - collapsedHeightPx) / (halfExpandedHeightPx - collapsedHeightPx)
+                progress.coerceIn(0f, 1f)
+            }
         }
     }
 
@@ -1141,20 +1306,25 @@ fun ThreeStateBottomSheet(
         onRegisterDismissDetail(null)
     }
 
-    val nestedScrollConnection = remember {
+    val nestedScrollConnection = remember(expandedHeightPx, halfExpandedHeightPx, collapsedHeightPx) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // Let child handle pre-scroll
+                // If scrolling up (available.y < 0) and sheet is not fully expanded, expand it first!
+                if (available.y < 0 && sheetHeightPx.value < expandedHeightPx) {
+                    if (sheetHeightPx.targetValue != expandedHeightPx) {
+                        coroutineScope.launch {
+                            sheetHeightPx.animateTo(expandedHeightPx)
+                        }
+                    }
+                    // Consume the scroll so the list doesn't scroll until the sheet is fully expanded
+                    return Offset(0f, available.y)
+                }
                 return Offset.Zero
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                // If child didn't consume upward scroll (meaning it's at the end), expand sheet
-                if (available.y < 0 && sheetHeightPx.value < expandedHeightPx) {
-                    coroutineScope.launch {
-                        sheetHeightPx.animateTo(expandedHeightPx)
-                    }
-                }
+                // Let detectVerticalDragGestures handle the unconsumed downward scroll.
+                // Doing animateTo here conflicts with smooth touch tracking.
                 return Offset.Zero
             }
         }
@@ -1163,7 +1333,13 @@ fun ThreeStateBottomSheet(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(with(density) { sheetHeightPx.value.toDp() })
+            .layout { measurable, constraints ->
+                val h = sheetHeightPx.value.toInt()
+                val placeable = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+                layout(placeable.width, placeable.height) {
+                    placeable.place(0, 0)
+                }
+            }
             .nestedScroll(nestedScrollConnection)
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
@@ -1205,7 +1381,9 @@ fun ThreeStateBottomSheet(
             .background(bgColor)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
         ) {
             // Drag handle area - Clicking here sets height to mid
             Box(
@@ -1234,7 +1412,7 @@ fun ThreeStateBottomSheet(
             // Morphing Top Bar Row
             SharedTransitionLayout {
                 AnimatedContent(
-                    targetState = activeExplorePost,
+                    targetState = if (selectedTab == "Explore") activeExplorePost else null,
                     transitionSpec = {
                         fadeIn(animationSpec = tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing))
                             .togetherWith(fadeOut(animationSpec = tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing)))
@@ -1319,7 +1497,14 @@ fun ThreeStateBottomSheet(
                     } else {
                         // Standard Search Bar Row — [Back?] [Capsule] [Profile]; detail mode only: back + wider capsule (10.dp inset/side)
                         androidx.compose.animation.AnimatedVisibility(
-                            visible = selectedTab != "Profile" && selectedTab != "ProfileEdit",
+                            visible = selectedTab != "Profile" &&
+                                selectedTab != "ProfileEdit" &&
+                                selectedTab != "Liked" &&
+                                selectedTab != "Saved" &&
+                                selectedTab != "Chat" &&
+                                selectedTab != "Report" &&
+                                selectedTab != "Help" &&
+                                selectedTab != "About",
                             enter = fadeIn() + slideInVertically { -it },
                             exit = fadeOut() + slideOutVertically { -it }
                         ) {
@@ -1331,15 +1516,6 @@ fun ThreeStateBottomSheet(
                             ) {
                                 // Standard Search Bar Row (Shared Element Logic)
                                 var searchQuery by remember { mutableStateOf("") }
-                                val placeholders = listOf("Coffee nearby", "Best Dessert Spot?","Restaurants near me","Best Pizza Place?","Dinner places","Bakery near me","Best café?","Family restaurant nearby","Romantic dinner place")
-                                var placeholderIndex by remember { mutableStateOf(0) }
-
-                                androidx.compose.runtime.LaunchedEffect(Unit) {
-                                    while (true) {
-                                        delay(3000)
-                                        placeholderIndex = (placeholderIndex + 1) % placeholders.size
-                                    }
-                                }
 
                                 val detailBar = playOrFitnessDetailOpen
                                 // Same height for back circle and search capsule in detail bar (and normal search bar)
@@ -1365,9 +1541,7 @@ fun ThreeStateBottomSheet(
 
                                 val searchCapsuleHorizontalPadding =
                                     if (detailBar) 8.dp else 0.dp
-                                OutlinedTextField(
-                                    value = searchQuery,
-                                    onValueChange = { searchQuery = it },
+                                Box(
                                     modifier = Modifier
                                         .weight(1f)
                                         .padding(horizontal = searchCapsuleHorizontalPadding)
@@ -1376,34 +1550,38 @@ fun ThreeStateBottomSheet(
                                             rememberSharedContentState(key = "top_bar_search"),
                                             animatedVisibilityScope = this@AnimatedContent,
                                             boundsTransform = { _, _ -> tween(400) }
-                                        ),
-                                    shape = RoundedCornerShape(25.dp),
-                                    placeholder = {
-                                        AnimatedContent(
-                                            targetState = placeholders[placeholderIndex],
-                                            transitionSpec = {
-                                                (slideInVertically { height -> height } + fadeIn()) togetherWith
-                                                        (slideOutVertically { height -> -height } + fadeOut())
-                                            },
-                                            label = "PlaceholderAnimation"
-                                        ) { text ->
-                                            Text(
-                                                text = text,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = textColor.copy(alpha = 0.6f)
-                                            )
-                                        }
-                                    },
-                                    leadingIcon = { Icon(painter = painterResource(id = R.drawable.ic_forum_outline), contentDescription = "Forum Icon", tint = textColor) },
-                                    textStyle = androidx.compose.ui.text.TextStyle(color = textColor),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = searchBarBgColor,
-                                        unfocusedContainerColor = searchBarBgColor,
-                                        focusedBorderColor = Color.Transparent,
-                                        unfocusedBorderColor = Color.Transparent
-                                    ),
-                                    singleLine = true
-                                )
+                                        )
+                                        .clip(RoundedCornerShape(25.dp))
+                                        .background(searchBarBgColor)
+                                        .clickable {
+                                            onTabSelected("Chat")
+                                            coroutineScope.launch {
+                                                sheetHeightPx.animateTo(expandedHeightPx)
+                                            }
+                                        },
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_forum_outline),
+                                            contentDescription = "Chat",
+                                            tint = textColor,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = aiSuggestions[currentSuggestionIndex],
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = textColor.copy(alpha = 0.6f),
+                                            modifier = Modifier.graphicsLayer {
+                                                alpha = suggestionAlpha.value
+                                            }
+                                        )
+                                    }
+                                }
                                 
                                 Spacer(modifier = Modifier.width(if (detailBar) 2.dp else 12.dp))
                                 
@@ -1439,12 +1617,28 @@ fun ThreeStateBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f) // Takes up remaining space as sheet expands
-                    .alpha(contentAlpha) // Fade out when collapsing
+                    .graphicsLayer { alpha = contentAlpha } // Fade out when collapsing
             ) {
                 AnimatedContent(
                     targetState = selectedTab,
                     transitionSpec = {
-                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                        if (targetState == "Chat") {
+                            // Entering Chat: slide up + fade in
+                            (slideInVertically(
+                                initialOffsetY = { it / 3 },
+                                animationSpec = tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                            ) + fadeIn(animationSpec = tween(400))) togetherWith
+                            fadeOut(animationSpec = tween(200))
+                        } else if (initialState == "Chat") {
+                            // Leaving Chat: slide down + fade out
+                            fadeIn(animationSpec = tween(200)) togetherWith
+                            (slideOutVertically(
+                                targetOffsetY = { it / 3 },
+                                animationSpec = tween(350, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                            ) + fadeOut(animationSpec = tween(300)))
+                        } else {
+                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                        }
                     },
                     label = "TabTransition"
                 ) { tab ->
@@ -1469,54 +1663,136 @@ fun ThreeStateBottomSheet(
                             onRegisterDismissDetail = { onRegisterDismissDetail(it) }
                         )
                         "Transit" -> TransitView(isDark = isDarkTheme, transitViewModel = transitViewModel)
+                        "Chat" -> ChatView(
+                            isDarkTheme = isDarkTheme,
+                            onBack = {
+                                onChatInitialMessageChanged(null)
+                                onTabSelected("Explore")
+                                coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                            },
+                            initialMessage = chatInitialMessage,
+                            onFocus = {
+                                coroutineScope.launch {
+                                    if (sheetHeightPx.value < expandedHeightPx * 0.8f) {
+                                        sheetHeightPx.animateTo(expandedHeightPx)
+                                    }
+                                }
+                            }
+                        )
                         "Profile" -> ProfileView(
                             isDarkTheme = isDarkTheme,
                             selectedTheme = selectedTheme,
                             onThemeSelected = onThemeSelected,
                             isAutomatic = isAutomatic,
                             onAutomaticToggle = onAutomaticToggle,
-                            onEditClick = { onTabSelected("ProfileEdit") }
+                            onEditClick = { onTabSelected("ProfileEdit") },
+                            onLikedClick = { onTabSelected("Liked") },
+                            onSavedClick = { onTabSelected("Saved") },
+                            onReportClick = { onTabSelected("Report") },
+                            onHelpClick = { onTabSelected("Help") },
+                            onAboutClick = { onTabSelected("About") }
+                        )
+                        "Help" -> {
+                            val localCtx = androidx.compose.ui.platform.LocalContext.current
+                            HelpView(
+                                isDarkTheme = isDarkTheme,
+                                onBack = { onTabSelected("Profile") },
+                                onReport = { onTabSelected("Report") },
+                                onShare = {
+                                    val sendIntent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, "Check out Kochi One, the ultimate city guide app!")
+                                        type = "text/plain"
+                                    }
+                                    val shareIntent = android.content.Intent.createChooser(sendIntent, null)
+                                    androidx.core.content.ContextCompat.startActivity(localCtx, shareIntent, null)
+                                },
+                                onAskLilly = { question ->
+                                    onChatInitialMessageChanged(question)
+                                    onTabSelected("Chat")
+                                    coroutineScope.launch { sheetHeightPx.animateTo(expandedHeightPx) }
+                                }
+                            )
+                        }
+                        "About" -> {
+                            val localCtx = androidx.compose.ui.platform.LocalContext.current
+                            AboutView(
+                                isDarkTheme = isDarkTheme,
+                                onBack = { onTabSelected("Profile") },
+                                onReport = { onTabSelected("Report") },
+                                onShare = {
+                                    val sendIntent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, "Check out Kochi One, the ultimate city guide app!")
+                                        type = "text/plain"
+                                    }
+                                    val shareIntent = android.content.Intent.createChooser(sendIntent, null)
+                                    androidx.core.content.ContextCompat.startActivity(localCtx, shareIntent, null)
+                                }
+                            )
+                        }
+                        "Report" -> ReportView(
+                            isDarkTheme = isDarkTheme,
+                            onBack = { onTabSelected("Profile") }
                         )
                         "ProfileEdit" -> ProfileEditView(
                             isDarkTheme = isDarkTheme,
                             onBack = { onTabSelected("Profile") },
                             onSave = { onTabSelected("Profile") }
                         )
+                        "Liked" -> LikedSavedItemsView(
+                            isDarkTheme = isDarkTheme,
+                            bucket = SavedBucket.LIKED,
+                            onBack = { onTabSelected("Profile") }
+                        )
+                        "Saved" -> LikedSavedItemsView(
+                            isDarkTheme = isDarkTheme,
+                            bucket = SavedBucket.SAVED,
+                            onBack = { onTabSelected("Profile") }
+                        )
                     }
                 }
             }
             
-            HorizontalDivider(color = dividerColor)
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(bgColor)
-                    .height(bottomNavReservedHeight)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .padding(bottom = 16.dp), // Extra padding for window bottom edge
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore", isDarkTheme) {
-                    onTabSelected("Explore")
-                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-                }
-                NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food", isDarkTheme) {
-                    onTabSelected("Food")
-                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-                }
-                NavItem(R.drawable.ic_play, "Play", selectedTab == "Play", isDarkTheme) {
-                    onTabSelected("Play")
-                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-                }
-                NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness", isDarkTheme) {
-                    onTabSelected("Fitness")
-                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-                }
-                NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit", isDarkTheme) {
-                    onTabSelected("Transit")
-                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+            val isImeVisible = WindowInsets.isImeVisible
+            
+            if (!isImeVisible) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(bgColor)
+                        .navigationBarsPadding()
+                ) {
+                    HorizontalDivider(color = dividerColor.copy(alpha = 0.5f))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(bottomNavReservedHeight)
+                            .padding(horizontal = 4.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore", isDarkTheme, Modifier.weight(1f)) {
+                            onTabSelected("Explore")
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                        }
+                        NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food", isDarkTheme, Modifier.weight(1f)) {
+                            onTabSelected("Food")
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                        }
+                        NavItem(R.drawable.ic_play, "Play", selectedTab == "Play", isDarkTheme, Modifier.weight(1f)) {
+                            onTabSelected("Play")
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                        }
+                        NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness", isDarkTheme, Modifier.weight(1f)) {
+                            onTabSelected("Fitness")
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                        }
+                        NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit", isDarkTheme, Modifier.weight(1f)) {
+                            onTabSelected("Transit")
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                        }
+                    }
                 }
             }
         }
@@ -1524,29 +1800,47 @@ fun ThreeStateBottomSheet(
 }
 
 @Composable
-fun NavItem(iconResId: Int, label: String, isSelected: Boolean, isDark: Boolean, onClick: () -> Unit) {
+fun NavItem(iconResId: Int, label: String, isSelected: Boolean, isDark: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val selectedColor = if (isDark) Color.White else Color.Black
-    val unselectedColor = Color.Gray
-    val iconTint = if (isSelected) selectedColor else unselectedColor
+    val unselectedColor = if (isDark) Color(0xFF606060) else Color(0xFF9E9E9E)
+
+    val iconColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isSelected) selectedColor else unselectedColor,
+        animationSpec = androidx.compose.animation.core.tween(220),
+        label = "navIconColor"
+    )
+    val iconScale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isSelected) 1.15f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.5f,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        ),
+        label = "navScale"
+    )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null
-        ) { onClick() }
+        modifier = modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClick() }
     ) {
         Icon(
             painter = painterResource(id = iconResId),
             contentDescription = label,
-            tint = iconTint,
-            modifier = Modifier.size(20.dp) // Smaller icon size
+            tint = iconColor,
+            modifier = Modifier
+                .size(20.dp)
+                .scale(iconScale)
         )
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(3.dp))
         Text(
-            text = label, 
-            style = MaterialTheme.typography.labelSmall, // Smaller text
-            color = iconTint
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = iconColor,
+            fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.SemiBold
+                         else androidx.compose.ui.text.font.FontWeight.Normal
         )
     }
 }

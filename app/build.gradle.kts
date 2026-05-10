@@ -64,6 +64,7 @@ dependencies {
     // Coil For Image Loading
     implementation(libs.coil.compose)
     implementation(libs.coil.svg)
+    implementation("io.coil-kt:coil-video:2.6.0")
     
     // Retrofit & Networking
     implementation(libs.retrofit)
