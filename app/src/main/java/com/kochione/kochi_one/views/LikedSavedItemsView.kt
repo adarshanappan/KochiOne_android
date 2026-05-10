@@ -100,18 +100,25 @@ fun LikedSavedItemsView(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_chevron_left),
-                        contentDescription = "Back",
-                        tint = subText,
+                    Box(
                         modifier = Modifier
-                            .size(22.dp)
+                            .size(40.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF0F0F0))
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
-                            ) { onBack() }
-                    )
-                    Spacer(modifier = Modifier.size(10.dp))
+                            ) { onBack() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_chevron_left),
+                            contentDescription = "Back",
+                            tint = text,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.size(12.dp))
                     Text(
                         text = if (bucket == SavedBucket.LIKED) "Liked" else "Saved",
                         style = MaterialTheme.typography.headlineSmall,
@@ -502,17 +509,24 @@ private fun OpenedSavedItemFullView(
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_chevron_left),
-                    contentDescription = "Back",
-                    tint = secondary,
+                Box(
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(40.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF0F0F0))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
-                        ) { onBack() }
-                )
+                        ) { onBack() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_chevron_left),
+                        contentDescription = "Back",
+                        tint = primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             Column(modifier = Modifier.padding(horizontal = 14.dp)) {

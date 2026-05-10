@@ -534,22 +534,36 @@ fun MainScreen(
     val coroutineScope = rememberCoroutineScope()
 
     BackHandler {
-        if (selectedTab == "Chat") {
-            onTabSelected("Explore")
-            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
-        } else if (sheetHeightPx.value > halfExpandedHeightPx + 20f) {
-            coroutineScope.launch {
-                sheetHeightPx.animateTo(halfExpandedHeightPx)
+        when (selectedTab) {
+            "Chat" -> {
+                onTabSelected("Explore")
+                coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
             }
-        } else if (selectedTab != "Explore") {
-            onTabSelected("Explore")
-        } else {
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastBackPressTime < 2000) {
-                (context as? android.app.Activity)?.finish()
-            } else {
-                lastBackPressTime = currentTime
-                android.widget.Toast.makeText(context, "Press back again to exit", android.widget.Toast.LENGTH_SHORT).show()
+            "ProfileEdit", "Liked", "Saved", "Report", "Help", "About" -> {
+                // Sub-screens of Profile → go back to Profile
+                onTabSelected("Profile")
+            }
+            "Profile" -> {
+                // Profile root → go back to Explore and collapse sheet
+                onTabSelected("Explore")
+                coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+            }
+            else -> {
+                if (sheetHeightPx.value > halfExpandedHeightPx + 20f) {
+                    coroutineScope.launch {
+                        sheetHeightPx.animateTo(halfExpandedHeightPx)
+                    }
+                } else if (selectedTab != "Explore") {
+                    onTabSelected("Explore")
+                } else {
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastBackPressTime < 2000) {
+                        (context as? android.app.Activity)?.finish()
+                    } else {
+                        lastBackPressTime = currentTime
+                        android.widget.Toast.makeText(context, "Press back again to exit", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
     }

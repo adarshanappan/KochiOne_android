@@ -307,17 +307,24 @@ fun AboutView(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_chevron_left),
-                    contentDescription = "Back",
+                Box(
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (isDarkTheme) Color(0xFF3A3A3A) else Color(0xFFE5E5E5))
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null
                         ) { onBack() },
-                    tint = textColor
-                )
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_chevron_left),
+                        contentDescription = "Back",
+                        modifier = Modifier.size(20.dp),
+                        tint = textColor
+                    )
+                }
                 Box(modifier = Modifier.width(1.dp).height(20.dp).background(secondaryText.copy(alpha = 0.2f)))
                 Icon(
                     painter = painterResource(id = R.drawable.ic_info),

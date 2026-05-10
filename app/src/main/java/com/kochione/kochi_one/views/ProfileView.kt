@@ -24,7 +24,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -33,12 +32,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.ui.graphics.graphicsLayer
 import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileView(
@@ -64,6 +68,41 @@ fun ProfileView(
     val systemDark = isSystemInDarkTheme()
     val effectiveForSelection = if (isAutomatic) systemDark else (selectedTheme == "Dark")
 
+    // ── Entrance animations ─────────────────────────────────────────────────
+    val headerAlpha  = remember { Animatable(0f) }
+    val headerOffset = remember { Animatable(-24f) }
+    val themeAlpha   = remember { Animatable(0f) }
+    val themeOffset  = remember { Animatable(40f) }
+    val likedAlpha   = remember { Animatable(0f) }
+    val likedOffset  = remember { Animatable(40f) }
+    val supportAlpha = remember { Animatable(0f) }
+    val supportOffset= remember { Animatable(40f) }
+    val settingsAlpha= remember { Animatable(0f) }
+    val settingsOffset=remember { Animatable(40f) }
+
+    val coroutineScope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        // Header slides in from top
+        launch { headerAlpha.animateTo(1f, tween(350, easing = EaseOutCubic)) }
+        launch { headerOffset.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow)) }
+        delay(80)
+        // Theme cards spring up
+        launch { themeAlpha.animateTo(1f, tween(420, easing = EaseOutCubic)) }
+        launch { themeOffset.animateTo(0f, spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessLow)) }
+        delay(80)
+        // Liked/Saved section
+        launch { likedAlpha.animateTo(1f, tween(380, easing = EaseOutCubic)) }
+        launch { likedOffset.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow)) }
+        delay(70)
+        // Support section
+        launch { supportAlpha.animateTo(1f, tween(360, easing = EaseOutCubic)) }
+        launch { supportOffset.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow)) }
+        delay(60)
+        // Settings/About section
+        launch { settingsAlpha.animateTo(1f, tween(340, easing = EaseOutCubic)) }
+        launch { settingsOffset.animateTo(0f, spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessLow)) }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -76,6 +115,10 @@ fun ProfileView(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 32.dp)
+                .graphicsLayer {
+                    alpha = headerAlpha.value
+                    translationY = headerOffset.value
+                }
                 .clickable { onEditClick() },
             shape = RoundedCornerShape(24.dp),
             color = cardColor,
@@ -137,18 +180,34 @@ fun ProfileView(
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = textColor,
-            modifier = Modifier.padding(bottom = 8.dp)
+            modifier = Modifier
+                .padding(bottom = 8.dp)
+                .graphicsLayer {
+                    alpha = themeAlpha.value
+                    translationY = themeOffset.value
+                }
         )
         Text(
             text = "Choose whether Kochi One follows your device appearance or stays in a fixed theme.",
             style = MaterialTheme.typography.bodyMedium,
             color = secondaryTextColor,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier
+                .padding(bottom = 24.dp)
+                .graphicsLayer {
+                    alpha = themeAlpha.value
+                    translationY = themeOffset.value
+                }
         )
 
         // Theme Selection Cards
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+                .graphicsLayer {
+                    alpha = themeAlpha.value
+                    translationY = themeOffset.value
+                },
             shape = RoundedCornerShape(24.dp),
             color = cardColor,
             tonalElevation = 2.dp
@@ -161,7 +220,7 @@ fun ProfileView(
                     // Light Theme Preview
                     ThemeOption(
                         label = "Light",
-                        isSelected = !effectiveForSelection,
+                        isSelected = !isAutomatic && !effectiveForSelection,
                         onSelect = { offset ->
                             onThemeSelected("Light", offset)
                         },
@@ -172,7 +231,7 @@ fun ProfileView(
                     // Dark Theme Preview
                     ThemeOption(
                         label = "Dark",
-                        isSelected = effectiveForSelection,
+                        isSelected = !isAutomatic && effectiveForSelection,
                         onSelect = { offset ->
                             onThemeSelected("Dark", offset)
                         },
@@ -265,7 +324,11 @@ fun ProfileView(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .graphicsLayer {
+                    alpha = likedAlpha.value
+                    translationY = likedOffset.value
+                },
             shape = RoundedCornerShape(28.dp),
             color = cardColor,
             tonalElevation = 2.dp
@@ -296,7 +359,11 @@ fun ProfileView(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .graphicsLayer {
+                    alpha = supportAlpha.value
+                    translationY = supportOffset.value
+                },
             shape = RoundedCornerShape(28.dp),
             color = cardColor,
             tonalElevation = 2.dp
@@ -338,7 +405,11 @@ fun ProfileView(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .graphicsLayer {
+                    alpha = settingsAlpha.value
+                    translationY = settingsOffset.value
+                },
             shape = RoundedCornerShape(28.dp),
             color = cardColor,
             tonalElevation = 2.dp
@@ -465,7 +536,10 @@ fun ThemeOption(
             modifier = Modifier
                 .aspectRatio(0.75f)
                 .fillMaxWidth()
-                .scale(scale)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .border(2.dp, borderColor, RoundedCornerShape(16.dp)),
             shape = RoundedCornerShape(16.dp),
             tonalElevation = if (isSelected) 8.dp else 4.dp
