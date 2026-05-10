@@ -76,7 +76,11 @@ class FoodViewModel : ViewModel() {
                     _detailErrorMessage.value = "Failed to load restaurant details"
                 }
             } catch (e: Exception) {
-                _detailErrorMessage.value = "Network error: ${e.localizedMessage}"
+                if (e is java.net.SocketTimeoutException || e.message?.contains("timeout", ignoreCase = true) == true) {
+                    _detailErrorMessage.value = "somthing worng try again"
+                } else {
+                    _detailErrorMessage.value = "Network error: ${e.localizedMessage}"
+                }
             } finally {
                 _isDetailLoading.value = false
             }

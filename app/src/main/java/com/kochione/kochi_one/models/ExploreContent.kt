@@ -13,7 +13,7 @@ object ExploreContentParser {
     private val markerRegex = Regex("""\((\d)\)(?s:(.*?))\(\1\)""")
 
     fun parse(body: String): List<ExploreContentBlock> {
-        return markerRegex.findAll(body).mapNotNull { matchResult ->
+        val parsed = markerRegex.findAll(body).mapNotNull { matchResult ->
             val markerType = matchResult.groupValues[1]
             val content = matchResult.groupValues[2].trim()
             
@@ -26,5 +26,12 @@ object ExploreContentParser {
                 else -> null
             }
         }.toList()
+        
+        // If the backend sends plain text without markers, just treat it as a normal paragraph
+        return if (parsed.isEmpty() && body.isNotBlank()) {
+            listOf(ExploreContentBlock.Paragraph(body.trim()))
+        } else {
+            parsed
+        }
     }
 }

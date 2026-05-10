@@ -27,6 +27,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -77,6 +78,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -90,6 +92,10 @@ import com.kochione.kochi_one.R
 import com.kochione.kochi_one.models.DayHours
 import com.kochione.kochi_one.models.Restaurant
 import com.kochione.kochi_one.utils.KochiLinkType
+import com.kochione.kochi_one.utils.LikedSavedStore
+import com.kochione.kochi_one.utils.SavedBucket
+import com.kochione.kochi_one.utils.SavedItem
+import com.kochione.kochi_one.utils.SavedSection
 import com.kochione.kochi_one.utils.buildKochiDeepLink
 import com.kochione.kochi_one.utils.isOpenAtNow
 import com.kochione.kochi_one.utils.minutesUntilCloseIfOpen
@@ -425,6 +431,9 @@ private fun FoodDetailGallerySection(
 ) {
     // val isDarkTheme = isSystemInDarkTheme() // Shadowing removed
     val selectedThumbBorderColor = if (isDarkTheme) Color.White else Color.Black
+    val thumbListState = rememberLazyListState()
+    val thumbWidth = 150.dp
+    val thumbSpacing = 12.dp
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -539,50 +548,62 @@ private fun FoodDetailGallerySection(
             }
         }
 
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                Spacer(modifier = Modifier.width(20.dp))
-            }
-            itemsIndexed(images) { index, imageUrl ->
-                val isSelected = index == selectedIndex
-                val thumbShape = RoundedCornerShape(22.dp)
-                val thumbAlpha by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.42f,
-                    animationSpec = tween(320, easing = FastOutSlowInEasing),
-                    label = "gallery_thumb_alpha"
-                )
-                Box(
-                    modifier = Modifier
-                        .size(width = 150.dp, height = 95.dp)
-                        .alpha(thumbAlpha)
-                        .then(
-                            if (isSelected) {
-                                Modifier.border(2.dp, selectedThumbBorderColor, thumbShape)
-                            } else {
-                                Modifier
-                            }
-                        )
-                        .clip(thumbShape)
-                        .clickable(
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                            indication = null
-                        ) { onSelectedIndexChange(index) }
-                ) {
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = "Thumbnail ${index + 1}",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF1E1E1E)),
-                        contentScale = ContentScale.Crop
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val density = LocalDensity.current
+            val viewportWidthPx = with(density) { maxWidth.roundToPx() }
+            val thumbWidthPx = with(density) { thumbWidth.roundToPx() }
+
+            LaunchedEffect(selectedIndex, images.size, viewportWidthPx) {
+                if (images.isNotEmpty() && selectedIndex in images.indices) {
+                    val centerOffset = (viewportWidthPx - thumbWidthPx) / 2
+                    thumbListState.animateScrollToItem(
+                        index = selectedIndex,
+                        scrollOffset = -centerOffset
                     )
                 }
             }
-            item {
-                Spacer(modifier = Modifier.width(20.dp))
+
+            LazyRow(
+                state = thumbListState,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(thumbSpacing)
+            ) {
+                itemsIndexed(images) { index, imageUrl ->
+                    val isSelected = index == selectedIndex
+                    val thumbShape = RoundedCornerShape(22.dp)
+                    val thumbAlpha by animateFloatAsState(
+                        targetValue = if (isSelected) 1f else 0.42f,
+                        animationSpec = tween(320, easing = FastOutSlowInEasing),
+                        label = "gallery_thumb_alpha"
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(width = thumbWidth, height = 95.dp)
+                            .alpha(thumbAlpha)
+                            .then(
+                                if (isSelected) {
+                                    Modifier.border(2.dp, selectedThumbBorderColor, thumbShape)
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .clip(thumbShape)
+                            .clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) { onSelectedIndexChange(index) }
+                    ) {
+                        AsyncImage(
+                            model = imageUrl,
+                            contentDescription = "Thumbnail ${index + 1}",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0xFF1E1E1E)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
             }
         }
     }
@@ -1157,11 +1178,19 @@ fun FoodDetailActionBar(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var isLiked by remember { mutableStateOf(false) }
-    var isSaved by remember { mutableStateOf(false) }
+    val todayHours = getTodayHours(restaurant)
+    val status = getOpenStatus(todayHours)
+    val closeLabel = formatTo12Hour(todayHours.close)
+    val itemId = restaurant.bizId.ifBlank { restaurant.name }
+    var isLiked by remember(itemId) {
+        mutableStateOf(LikedSavedStore.isInBucket(context, SavedBucket.LIKED, SavedSection.EATS, itemId))
+    }
+    var isSaved by remember(itemId) {
+        mutableStateOf(LikedSavedStore.isInBucket(context, SavedBucket.SAVED, SavedSection.EATS, itemId))
+    }
 
-    // Transparent Glassmorphism style
-    val barBg = if (isDarkTheme) Color(0xCC1E1E1E) else Color(0x99FFFFFF)
+    // Solid 'white black mix' (grey) background style per user request
+    val barBg = if (isDarkTheme) Color(0xFF2A2A2A) else Color(0xFFF0F0F0)
     val glassBorder = if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.1f)
     val iconTint = if (isDarkTheme) Color.White else Color(0xFF111418)
 
@@ -1187,7 +1216,7 @@ fun FoodDetailActionBar(
                 onClick = { openDialer(context, restaurant.contact.phone) }
             )
             ActionBarIcon(
-                iconRes = R.drawable.ic_direction,
+                iconRes = R.drawable.ic_near_me,
                 contentDescription = "Directions",
                 tint = iconTint,
                 onClick = { 
@@ -1208,7 +1237,29 @@ fun FoodDetailActionBar(
                 activateScale = 1.3f,
                 activateDurationMs = 150,
                 resetDurationMs = 150,
-                onClick = { isLiked = !isLiked }
+                onClick = {
+                    isLiked = !isLiked
+                    LikedSavedStore.setInBucket(
+                        context = context,
+                        bucket = SavedBucket.LIKED,
+                        item = SavedItem(
+                            id = itemId,
+                            section = SavedSection.EATS,
+                            title = restaurant.name,
+                            subtitle = restaurant.restaurantType.orEmpty(),
+                            description = restaurant.description,
+                            imageUrl = restaurant.coverImages.firstOrNull()?.url
+                                ?: restaurant.logo?.url
+                                ?: "",
+                            logoUrl = restaurant.logo?.url,
+                            galleryImages = restaurant.coverImages.mapNotNull { it.url.takeIf { u -> u.isNotBlank() } },
+                            distanceLabel = "${"%.1f".format(restaurant.rating)} km",
+                            statusLabel = status,
+                            statusSuffix = if (status != "Closed" && !closeLabel.isNullOrBlank()) "closes $closeLabel" else null
+                        ),
+                        enabled = isLiked
+                    )
+                }
             )
             ActionBarIcon(
                 iconRes = if (isSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark,
@@ -1219,7 +1270,29 @@ fun FoodDetailActionBar(
                 activateScale = 1.2f,
                 activateDurationMs = 100,
                 resetDurationMs = 100,
-                onClick = { isSaved = !isSaved }
+                onClick = {
+                    isSaved = !isSaved
+                    LikedSavedStore.setInBucket(
+                        context = context,
+                        bucket = SavedBucket.SAVED,
+                        item = SavedItem(
+                            id = itemId,
+                            section = SavedSection.EATS,
+                            title = restaurant.name,
+                            subtitle = restaurant.restaurantType.orEmpty(),
+                            description = restaurant.description,
+                            imageUrl = restaurant.coverImages.firstOrNull()?.url
+                                ?: restaurant.logo?.url
+                                ?: "",
+                            logoUrl = restaurant.logo?.url,
+                            galleryImages = restaurant.coverImages.mapNotNull { it.url.takeIf { u -> u.isNotBlank() } },
+                            distanceLabel = "${"%.1f".format(restaurant.rating)} km",
+                            statusLabel = status,
+                            statusSuffix = if (status != "Closed" && !closeLabel.isNullOrBlank()) "closes $closeLabel" else null
+                        ),
+                        enabled = isSaved
+                    )
+                }
             )
             ActionBarIcon(
                 iconRes = R.drawable.ic_share,

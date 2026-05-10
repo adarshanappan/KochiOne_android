@@ -24,12 +24,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
 
@@ -40,13 +47,22 @@ fun ProfileView(
     onThemeSelected: (String, androidx.compose.ui.geometry.Offset) -> Unit,
     isAutomatic: Boolean,
     onAutomaticToggle: (Boolean, androidx.compose.ui.geometry.Offset?) -> Unit,
-    onEditClick: () -> Unit
+    onEditClick: () -> Unit,
+    onLikedClick: () -> Unit,
+    onSavedClick: () -> Unit,
+    onReportClick: () -> Unit = {},
+    onHelpClick: () -> Unit = {},
+    onAboutClick: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
+    // isDarkTheme here = sheetIsDark (for visual consistency with the sheet)
     val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
     val cardColor = if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF5F5F5)
     val textColor = if (isDarkTheme) Color.White else Color.Black
     val secondaryTextColor = (if (isDarkTheme) Color.White else Color.Black).copy(alpha = 0.6f)
+    // For theme SELECTION STATE: use the actual effective theme (system when automatic)
+    val systemDark = isSystemInDarkTheme()
+    val effectiveForSelection = if (isAutomatic) systemDark else (selectedTheme == "Dark")
 
     Column(
         modifier = Modifier
@@ -145,10 +161,9 @@ fun ProfileView(
                     // Light Theme Preview
                     ThemeOption(
                         label = "Light",
-                        isSelected = if (isAutomatic) !isDarkTheme else selectedTheme == "Light",
+                        isSelected = !effectiveForSelection,
                         onSelect = { offset ->
                             onThemeSelected("Light", offset)
-                            onAutomaticToggle(false, offset)
                         },
                         modifier = Modifier.weight(1f),
                         isDarkTheme = isDarkTheme
@@ -157,10 +172,9 @@ fun ProfileView(
                     // Dark Theme Preview
                     ThemeOption(
                         label = "Dark",
-                        isSelected = if (isAutomatic) isDarkTheme else selectedTheme == "Dark",
+                        isSelected = effectiveForSelection,
                         onSelect = { offset ->
                             onThemeSelected("Dark", offset)
-                            onAutomaticToggle(false, offset)
                         },
                         modifier = Modifier.weight(1f),
                         isDarkTheme = isDarkTheme
@@ -262,7 +276,7 @@ fun ProfileView(
                     iconBgColor = Color(0xFFFF3B30),
                     label = "Liked",
                     isDarkTheme = isDarkTheme,
-                    onClick = { /* Handle Liked */ }
+                    onClick = onLikedClick
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 64.dp, end = 16.dp),
@@ -273,7 +287,7 @@ fun ProfileView(
                     iconBgColor = Color(0xFF007AFF),
                     label = "Saved",
                     isDarkTheme = isDarkTheme,
-                    onClick = { /* Handle Saved */ }
+                    onClick = onSavedClick
                 )
             }
         }
@@ -293,7 +307,7 @@ fun ProfileView(
                     iconBgColor = Color(0xFFFF9500),
                     label = "Report a problem",
                     isDarkTheme = isDarkTheme,
-                    onClick = { /* Handle Report */ }
+                    onClick = onReportClick
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 64.dp, end = 16.dp),
@@ -304,7 +318,7 @@ fun ProfileView(
                     iconBgColor = Color(0xFFFF9500),
                     label = "Help",
                     isDarkTheme = isDarkTheme,
-                    onClick = { /* Handle Help */ }
+                    onClick = onHelpClick
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 64.dp, end = 16.dp),
@@ -346,7 +360,7 @@ fun ProfileView(
                     iconBgColor = Color(0xFF8E8E93),
                     label = "About",
                     isDarkTheme = isDarkTheme,
-                    onClick = { /* Handle About */ }
+                    onClick = onAboutClick
                 )
             }
         }
@@ -414,8 +428,23 @@ fun ThemeOption(
     modifier: Modifier = Modifier,
     isDarkTheme: Boolean
 ) {
-    val borderColor = if (isSelected) Color(0xFF2196F3) else Color.Transparent
-    val tintColor = if (isSelected) Color(0xFF2196F3) else (if (isDarkTheme) Color.White else Color.Black).copy(alpha = 0.5f)
+    val unselectedTint = (if (isDarkTheme) Color.White else Color.Black).copy(alpha = 0.3f)
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF2196F3) else Color.Transparent,
+        animationSpec = tween(300),
+        label = "borderColor"
+    )
+    val tintColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF2196F3) else unselectedTint,
+        animationSpec = tween(300),
+        label = "tintColor"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.03f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
+        label = "scale"
+    )
 
     var globalPosition by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
 
@@ -436,35 +465,22 @@ fun ThemeOption(
             modifier = Modifier
                 .aspectRatio(0.75f)
                 .fillMaxWidth()
+                .scale(scale)
                 .border(2.dp, borderColor, RoundedCornerShape(16.dp)),
             shape = RoundedCornerShape(16.dp),
-            tonalElevation = 4.dp
+            tonalElevation = if (isSelected) 8.dp else 4.dp
         ) {
-            val previewBg = if (label == "Light") Color(0xFFF8F9FA) else Color(0xFF1E1E1E)
-            val previewCard = if (label == "Light") Color.White else Color(0xFF2C2C2C)
-            val previewAccent = Color(0xFF2196F3).copy(alpha = 0.4f)
-            
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(previewBg)
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Mock Header
-                Box(modifier = Modifier.fillMaxWidth().height(14.dp).clip(CircleShape).background(previewCard))
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                // Mock Content Card
-                Box(modifier = Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(previewCard)) {
-                    // Mock Inner Accent
-                    Box(modifier = Modifier.padding(8.dp).size(20.dp).clip(RoundedCornerShape(6.dp)).background(previewAccent))
-                }
-                
-                // Mock Content Card 2
-                Box(modifier = Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(previewCard))
+            val previewRes = if (label == "Light") {
+                R.drawable.theme_preview_light_map
+            } else {
+                R.drawable.theme_preview_dark_map
             }
+            Image(
+                painter = painterResource(id = previewRes),
+                contentDescription = "$label theme preview",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))

@@ -2,6 +2,7 @@ package com.kochione.kochi_one.views
 
 import android.content.Intent
 import android.net.Uri
+import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -9,11 +10,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -37,8 +33,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,27 +45,28 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
-import android.view.HapticFeedbackConstants
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kochione.kochi_one.R
 import com.kochione.kochi_one.transit.Metro.MetroStation
 import com.kochione.kochi_one.transit.Metro.data.KmrlOpenData
 import com.kochione.kochi_one.transit.Metro.data.TrainScheduleEntry
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.runtime.collectAsState
 import com.kochione.kochi_one.viewmodels.TransitViewModel
-
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import kotlin.math.abs
@@ -141,7 +140,7 @@ fun TransitView(isDark: Boolean, transitViewModel: TransitViewModel = viewModel(
     }
 
     // Auto-tick every 60 s so upcoming/past labels refresh in real time
-    var nowSecs by remember { mutableStateOf(nowSeconds()) }
+    var nowSecs by remember { mutableIntStateOf(nowSeconds()) }
     LaunchedEffect(Unit) {
         while (true) {
             kotlinx.coroutines.delay(60_000L)
@@ -742,8 +741,11 @@ private fun TrainScheduleRow(
                     fontSize = 13.sp
                 )
                 Spacer(Modifier.height(1.dp))
+                val fromIdx = KmrlOpenData.stations.indexOfFirst { it.stopId == fromStopId }
+                val toIdx = KmrlOpenData.stations.indexOfFirst { it.stopId == toStopId }
+                val pf = if (fromIdx < toIdx) "Platform 2" else "Platform 1"
                 Text(
-                    text  = if (isPast) "Departed" else "Not yet departed",
+                    text  = (if (isPast) "Departed" else "Not yet departed") + " • $pf",
                     color = dimColor.copy(alpha = 0.5f),
                     fontSize = 13.sp
                 )

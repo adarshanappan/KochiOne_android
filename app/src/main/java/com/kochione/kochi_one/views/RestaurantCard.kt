@@ -45,6 +45,10 @@ import com.kochione.kochi_one.R
 import com.kochione.kochi_one.models.Restaurant
 import com.kochione.kochi_one.ui.components.shimmerEffect
 import com.kochione.kochi_one.utils.KochiLinkType
+import com.kochione.kochi_one.utils.LikedSavedStore
+import com.kochione.kochi_one.utils.SavedBucket
+import com.kochione.kochi_one.utils.SavedItem
+import com.kochione.kochi_one.utils.SavedSection
 import com.kochione.kochi_one.utils.buildKochiDeepLink
 import com.kochione.kochi_one.utils.LocationRepository
 import com.kochione.kochi_one.utils.distanceInKm
@@ -349,6 +353,57 @@ fun RestaurantCard(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Action Bar
+        val saveDayHours = androidx.compose.runtime.remember(restaurant.operatingHours) {
+            val cal = java.util.Calendar.getInstance()
+            when (cal.get(java.util.Calendar.DAY_OF_WEEK)) {
+                java.util.Calendar.MONDAY -> restaurant.operatingHours.monday
+                java.util.Calendar.TUESDAY -> restaurant.operatingHours.tuesday
+                java.util.Calendar.WEDNESDAY -> restaurant.operatingHours.wednesday
+                java.util.Calendar.THURSDAY -> restaurant.operatingHours.thursday
+                java.util.Calendar.FRIDAY -> restaurant.operatingHours.friday
+                java.util.Calendar.SATURDAY -> restaurant.operatingHours.saturday
+                java.util.Calendar.SUNDAY -> restaurant.operatingHours.sunday
+                else -> restaurant.operatingHours.monday
+            }
+        }
+        val saveStatusLabel = run {
+            val calendar = java.util.Calendar.getInstance()
+            val nowMinutes = calendar.get(java.util.Calendar.HOUR_OF_DAY) * 60 +
+                calendar.get(java.util.Calendar.MINUTE)
+            when {
+                saveDayHours.closed -> "Closed"
+                !saveDayHours.isOpenAtNow(nowMinutes) -> "Closed"
+                else -> {
+                    val untilClose = saveDayHours.minutesUntilCloseIfOpen(nowMinutes)
+                    if (untilClose != null && untilClose in 0..60) "Closes soon" else "Open"
+                }
+            }
+        }
+        val saveCloseLabel = androidx.compose.runtime.remember(saveDayHours.close) {
+            val close = saveDayHours.close ?: return@remember null
+            try {
+                val parts = close.split(":")
+                if (parts.size >= 2) {
+                    val hour24 = parts[0].toIntOrNull() ?: return@remember close
+                    val minute = parts[1]
+                    val amPm = if (hour24 >= 12) "PM" else "AM"
+                    val hour12 = when {
+                        hour24 == 0 -> 12
+                        hour24 > 12 -> hour24 - 12
+                        else -> hour24
+                    }
+                    "$hour12:$minute $amPm"
+                } else close
+            } catch (_: Exception) {
+                close
+            }
+        }
+        val saveStatusSuffix = if (saveStatusLabel != "Closed" && !saveCloseLabel.isNullOrBlank()) {
+            "closes $saveCloseLabel"
+        } else {
+            null
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -373,7 +428,12 @@ fun RestaurantCard(
                     )
                 }
             )
-            var isFavorited by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            val itemId = restaurant.bizId.ifBlank { restaurant.name }
+            var isFavorited by androidx.compose.runtime.remember(itemId) {
+                androidx.compose.runtime.mutableStateOf(
+                    LikedSavedStore.isInBucket(context, SavedBucket.LIKED, SavedSection.EATS, itemId)
+                )
+            }
             val heartIcon = if (isFavorited) R.drawable.ic_heart_filled else R.drawable.ic_heart
             val heartTint = if (isFavorited) Color.Red else (if (isDarkTheme) Color.LightGray else Color.Gray)
             
@@ -392,6 +452,26 @@ fun RestaurantCard(
                         indication = null // Removes standard ripple for cleaner animation
                     ) { 
                         isFavorited = !isFavorited
+                        LikedSavedStore.setInBucket(
+                            context = context,
+                            bucket = SavedBucket.LIKED,
+                            item = SavedItem(
+                                id = itemId,
+                                section = SavedSection.EATS,
+                                title = restaurant.name,
+                                subtitle = restaurant.restaurantType.orEmpty(),
+                                description = restaurant.description,
+                                imageUrl = restaurant.coverImages.firstOrNull()?.url
+                                    ?: restaurant.logo?.url
+                                    ?: "",
+                                logoUrl = restaurant.logo?.url,
+                                galleryImages = restaurant.coverImages.mapNotNull { it.url.takeIf { u -> u.isNotBlank() } },
+                                distanceLabel = "%.1f km".format(restaurant.rating),
+                                statusLabel = saveStatusLabel,
+                                statusSuffix = saveStatusSuffix
+                            ),
+                            enabled = isFavorited
+                        )
                         if (isFavorited) {
                             coroutineScope.launch {
                                 scale.animateTo(
@@ -417,7 +497,11 @@ fun RestaurantCard(
                     }
                     .padding(12.dp)
             )
-            var isSaved by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            var isSaved by androidx.compose.runtime.remember(itemId) {
+                androidx.compose.runtime.mutableStateOf(
+                    LikedSavedStore.isInBucket(context, SavedBucket.SAVED, SavedSection.EATS, itemId)
+                )
+            }
             val saveIcon = if (isSaved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark
             val saveTint = if (isSaved) Color(0xFF0095FF) else (if (isDarkTheme) Color.LightGray else Color.Gray)
             val saveScale = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
@@ -434,6 +518,26 @@ fun RestaurantCard(
                         indication = null
                     ) { 
                         isSaved = !isSaved
+                        LikedSavedStore.setInBucket(
+                            context = context,
+                            bucket = SavedBucket.SAVED,
+                            item = SavedItem(
+                                id = itemId,
+                                section = SavedSection.EATS,
+                                title = restaurant.name,
+                                subtitle = restaurant.restaurantType.orEmpty(),
+                                description = restaurant.description,
+                                imageUrl = restaurant.coverImages.firstOrNull()?.url
+                                    ?: restaurant.logo?.url
+                                    ?: "",
+                                logoUrl = restaurant.logo?.url,
+                                galleryImages = restaurant.coverImages.mapNotNull { it.url.takeIf { u -> u.isNotBlank() } },
+                                distanceLabel = "%.1f km".format(restaurant.rating),
+                                statusLabel = saveStatusLabel,
+                                statusSuffix = saveStatusSuffix
+                            ),
+                            enabled = isSaved
+                        )
                         if (isSaved) {
                             coroutineScope.launch {
                                 saveScale.animateTo(
