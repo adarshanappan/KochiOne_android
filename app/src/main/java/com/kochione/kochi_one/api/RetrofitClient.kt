@@ -43,4 +43,8 @@ object RetrofitClient {
     val fitnessInstance: FitnessApiService by lazy {
         retrofit.create(FitnessApiService::class.java)
     }
+
+    val appUserInstance: AppUserApiService by lazy {
+        retrofit.create(AppUserApiService::class.java)
+    }
 }

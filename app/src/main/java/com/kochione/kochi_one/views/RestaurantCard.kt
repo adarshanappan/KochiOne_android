@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import com.kochione.kochi_one.ui.components.ProgressiveImage
 import com.kochione.kochi_one.R
 import com.kochione.kochi_one.models.Restaurant
 import com.kochione.kochi_one.ui.components.shimmerEffect
@@ -82,7 +82,8 @@ fun RestaurantCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Logo Image
-            AsyncImage(
+            ProgressiveImage(
+                showLoadingCircle = true,
                 model = restaurant.logo?.url ?: "https://via.placeholder.com/150",
                 contentDescription = "Restaurant Logo",
                 modifier = Modifier
@@ -251,7 +252,8 @@ fun RestaurantCard(
         if (displayImages.isNotEmpty()) {
             if (displayImages.size == 2) {
                 Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-                    AsyncImage(
+                    ProgressiveImage(
+                        showLoadingCircle = true,
                         model = displayImages[0].url,
                         contentDescription = "Cover Image 1",
                         modifier = Modifier
@@ -261,7 +263,8 @@ fun RestaurantCard(
                         contentScale = ContentScale.Crop
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    AsyncImage(
+                    ProgressiveImage(
+                        showLoadingCircle = true,
                         model = displayImages[1].url,
                         contentDescription = "Cover Image 2",
                         modifier = Modifier
@@ -283,7 +286,8 @@ fun RestaurantCard(
                                 .background(imageSlotBg)
                         ) {
                             if (displayImages.isNotEmpty()) {
-                                AsyncImage(
+                                ProgressiveImage(
+                                    showLoadingCircle = true,
                                     model = displayImages[0].url,
                                     contentDescription = "Cover Image 1",
                                     modifier = Modifier.fillMaxSize(),
@@ -300,7 +304,8 @@ fun RestaurantCard(
                                 .background(imageSlotBg)
                         ) {
                             if (displayImages.size > 1) {
-                                AsyncImage(
+                                ProgressiveImage(
+                                    showLoadingCircle = true,
                                     model = displayImages[1].url,
                                     contentDescription = "Cover Image 2",
                                     modifier = Modifier.fillMaxSize(),
@@ -320,7 +325,8 @@ fun RestaurantCard(
                                 .background(imageSlotBg)
                         ) {
                             if (displayImages.size > 2) {
-                                AsyncImage(
+                                ProgressiveImage(
+                                    showLoadingCircle = true,
                                     model = displayImages[2].url,
                                     contentDescription = "Cover Image 3",
                                     modifier = Modifier.fillMaxSize(),
@@ -337,7 +343,8 @@ fun RestaurantCard(
                                 .background(imageSlotBg)
                         ) {
                             if (displayImages.size > 3) {
-                                AsyncImage(
+                                ProgressiveImage(
+                                    showLoadingCircle = true,
                                     model = displayImages[3].url,
                                     contentDescription = "Cover Image 4",
                                     modifier = Modifier.fillMaxSize(),

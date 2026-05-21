@@ -126,7 +126,7 @@ fun ExploreView(
             // List View
             LazyColumn(
                 modifier = Modifier.fillMaxSize().background(bgColor),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp)
+                contentPadding = PaddingValues(top = 16.dp, bottom = 140.dp)
             ) {
                 item {
                     Text(

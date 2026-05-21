@@ -271,6 +271,9 @@ fun ExplorePostDetail(post: ExplorePost, isDarkTheme: Boolean, onClose: () -> Un
                     }
                     Spacer(modifier = Modifier.height(24.dp))
                 }
+                
+                // Add bottom padding to account for the bottom navigation bar
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
     }

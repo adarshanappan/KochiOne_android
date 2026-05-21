@@ -183,7 +183,7 @@ fun FoodView(isDarkTheme: Boolean, viewModel: FoodViewModel = viewModel()) {
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().background(bgColor),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 80.dp)
+            contentPadding = PaddingValues(top = 16.dp, bottom = 140.dp)
         ) {
             item {
                 Text(

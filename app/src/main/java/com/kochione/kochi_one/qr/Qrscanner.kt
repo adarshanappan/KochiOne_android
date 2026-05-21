@@ -1,6 +1,5 @@
 package com.kochione.kochi_one
 
-import android.app.Activity
 import android.content.Context
 import com.google.android.gms.common.moduleinstall.ModuleInstall
 import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
@@ -30,18 +29,12 @@ object QrScanner {
         onCancelled: () -> Unit = {},
         onFailure: (Exception) -> Unit = {}
     ) {
-        val activity = context as? Activity
-            ?: run {
-                onFailure(IllegalStateException("QrScanner requires an Activity context"))
-                return
-            }
-
         val options = GmsBarcodeScannerOptions.Builder()
             .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
             .enableAutoZoom()
             .build()
 
-        val scanner = GmsBarcodeScanning.getClient(activity, options)
+        val scanner = GmsBarcodeScanning.getClient(context, options)
 
         scanner.startScan()
             .addOnSuccessListener { barcode ->
@@ -52,4 +45,3 @@ object QrScanner {
             .addOnFailureListener { e -> onFailure(e) }
     }
 }
-

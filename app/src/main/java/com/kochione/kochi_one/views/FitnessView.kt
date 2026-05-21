@@ -1,5 +1,6 @@
 package com.kochione.kochi_one.views
 
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -52,7 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.kochione.kochi_one.ui.components.ProgressiveImage
 import com.kochione.kochi_one.R
 import com.kochione.kochi_one.models.DayHours
 import com.kochione.kochi_one.models.FitnessVenue
@@ -106,17 +108,15 @@ fun FitnessView(
     var selectedCard by remember { mutableStateOf<FitnessCardData?>(null) }
     var selectedVenue by remember { mutableStateOf<FitnessVenue?>(null) }
 
-    androidx.compose.runtime.LaunchedEffect(selectedCard, selectedVenue) {
-        onDetailVisibilityChanged(selectedCard != null || selectedVenue != null)
-    }
-
     DisposableEffect(selectedCard, selectedVenue) {
         if (selectedCard != null || selectedVenue != null) {
             onRegisterDismissDetail {
                 if (selectedVenue != null) {
                     selectedVenue = null
+                    onDetailVisibilityChanged(selectedCard != null)
                 } else {
                     selectedCard = null
+                    onDetailVisibilityChanged(false)
                 }
             }
         } else {
@@ -132,7 +132,7 @@ fun FitnessView(
                 .background(bgColor),
             contentPadding = PaddingValues(
                 top = 16.dp,
-                bottom = 88.dp,
+                bottom = 140.dp,
                 start = FitnessScreenPaddingH,
                 end = FitnessScreenPaddingH
             ),
@@ -168,7 +168,10 @@ fun FitnessView(
                                 modifier = Modifier
                                     .weight(0.50f)
                                     .fillMaxHeight(),
-                                onCardClick = { selectedCard = hero }
+                                onCardClick = { 
+                                    selectedCard = hero 
+                                    onDetailVisibilityChanged(true)
+                                }
                             )
                             Column(
                                 modifier = Modifier
@@ -181,14 +184,20 @@ fun FitnessView(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f),
-                                    onCardClick = { selectedCard = stackTop }
+                                    onCardClick = { 
+                                        selectedCard = stackTop 
+                                        onDetailVisibilityChanged(true)
+                                    }
                                 )
                                 FitnessFeatureCard(
                                     card = stackBottom,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f),
-                                    onCardClick = { selectedCard = stackBottom }
+                                    onCardClick = { 
+                                        selectedCard = stackBottom 
+                                        onDetailVisibilityChanged(true)
+                                    }
                                 )
                             }
                         }
@@ -199,23 +208,59 @@ fun FitnessView(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(172.dp),
-                                onCardClick = { selectedCard = card }
+                                onCardClick = { 
+                                    selectedCard = card 
+                                    onDetailVisibilityChanged(true)
+                                }
                             )
                         }
                     }
                 }
             }
         }
-        if (selectedCard != null) {
-            val detailVenues = buildFitnessDetailVenuesForCard(selectedCard!!, venues)
-            if (detailVenues.isNotEmpty()) {
-                FitnessVenueFullScreenSheet(
-                    venues = detailVenues,
-                    isDarkTheme = isDarkTheme,
-                    onVenueClick = { venue -> selectedVenue = venue }
-                )
+        androidx.compose.animation.AnimatedContent(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(2f),
+            targetState = selectedCard,
+            transitionSpec = {
+                if (targetState != null) {
+                    (androidx.compose.animation.slideInHorizontally(
+                        initialOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300)
+                    ) togetherWith androidx.compose.animation.slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> -fullWidth },
+                        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300)
+                    )).apply {
+                        targetContentZIndex = 1f
+                    }
+                } else {
+                    (androidx.compose.animation.slideInHorizontally(
+                        initialOffsetX = { fullWidth -> -fullWidth },
+                        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300)
+                    ) togetherWith androidx.compose.animation.slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300)
+                    )).apply {
+                        targetContentZIndex = -1f
+                    }
+                }
+            },
+            label = "fitness-details-transition"
+        ) { card ->
+            if (card != null) {
+                val detailVenues = buildFitnessDetailVenuesForCard(card, venues)
+                if (detailVenues.isNotEmpty()) {
+                    FitnessVenueFullScreenSheet(
+                        venues = detailVenues,
+                        isDarkTheme = isDarkTheme,
+                        onVenueClick = { venue -> selectedVenue = venue }
+                    )
+                } else {
+                    FitnessVenueEmptyFullScreenSheet(card = card, isDarkTheme = isDarkTheme)
+                }
             } else {
-                FitnessVenueEmptyFullScreenSheet(card = selectedCard!!, isDarkTheme = isDarkTheme)
+                Spacer(modifier = Modifier.size(0.dp))
             }
         }
         selectedVenue?.let { venue ->
@@ -328,7 +373,7 @@ private fun FitnessFeatureCard(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    AsyncImage(
+                    ProgressiveImage(
                         model = card.imageUrl,
                         contentDescription = card.title,
                         modifier = Modifier.fillMaxSize(),
@@ -441,7 +486,7 @@ private fun FitnessCentreCardContent(card: FitnessCardData) {
                 alpha = 0.52f
             )
         } else {
-            AsyncImage(
+            ProgressiveImage(
                 model = card.imageUrl,
                 contentDescription = card.title,
                 modifier = Modifier.fillMaxSize(),
@@ -653,7 +698,8 @@ private fun FitnessVenueFullScreenSheet(
                                 ) {
                                     val logo = venue.logo?.url
                                     if (!logo.isNullOrBlank()) {
-                                        AsyncImage(
+                                        ProgressiveImage(
+                                            showLoadingCircle = true,
                                             model = logo,
                                             contentDescription = venue.name,
                                             modifier = Modifier.fillMaxSize(),
@@ -734,7 +780,8 @@ private fun FitnessVenueFullScreenSheet(
                         if (displayedCoverUrls.isNotEmpty()) {
                             if (displayedCoverUrls.size == 2) {
                                 Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-                                    AsyncImage(
+                                    ProgressiveImage(
+                                        showLoadingCircle = true,
                                         model = displayedCoverUrls[0],
                                         contentDescription = venue.name,
                                         modifier = Modifier
@@ -744,7 +791,8 @@ private fun FitnessVenueFullScreenSheet(
                                         contentScale = ContentScale.Crop
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    AsyncImage(
+                                    ProgressiveImage(
+                                        showLoadingCircle = true,
                                         model = displayedCoverUrls[1],
                                         contentDescription = venue.name,
                                         modifier = Modifier
@@ -765,7 +813,8 @@ private fun FitnessVenueFullScreenSheet(
                                                 .background(imageSlotBg)
                                         ) {
                                             if (displayedCoverUrls.isNotEmpty()) {
-                                                AsyncImage(
+                                                ProgressiveImage(
+                                                    showLoadingCircle = true,
                                                     model = displayedCoverUrls[0],
                                                     contentDescription = venue.name,
                                                     modifier = Modifier.fillMaxSize(),
@@ -782,7 +831,8 @@ private fun FitnessVenueFullScreenSheet(
                                                 .background(imageSlotBg)
                                         ) {
                                             if (displayedCoverUrls.size > 1) {
-                                                AsyncImage(
+                                                ProgressiveImage(
+                                                    showLoadingCircle = true,
                                                     model = displayedCoverUrls[1],
                                                     contentDescription = venue.name,
                                                     modifier = Modifier.fillMaxSize(),
@@ -801,7 +851,8 @@ private fun FitnessVenueFullScreenSheet(
                                                 .background(imageSlotBg)
                                         ) {
                                             if (displayedCoverUrls.size > 2) {
-                                                AsyncImage(
+                                                ProgressiveImage(
+                                                    showLoadingCircle = true,
                                                     model = displayedCoverUrls[2],
                                                     contentDescription = venue.name,
                                                     modifier = Modifier.fillMaxSize(),
@@ -818,7 +869,8 @@ private fun FitnessVenueFullScreenSheet(
                                                 .background(imageSlotBg)
                                         ) {
                                             if (displayedCoverUrls.size > 3) {
-                                                AsyncImage(
+                                                ProgressiveImage(
+                                                    showLoadingCircle = true,
                                                     model = displayedCoverUrls[3],
                                                     contentDescription = venue.name,
                                                     modifier = Modifier.fillMaxSize(),

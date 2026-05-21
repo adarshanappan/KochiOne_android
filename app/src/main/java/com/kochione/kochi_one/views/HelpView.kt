@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -406,7 +407,7 @@ fun HelpView(
                 }
             }
 
-            Spacer(modifier = Modifier.height(120.dp))
+            Spacer(modifier = Modifier.height(160.dp))
         } // Closes inner Column
     } // Closes outer Column
 
@@ -415,7 +416,8 @@ fun HelpView(
     Box(
         modifier = Modifier
             .align(Alignment.BottomCenter)
-            .padding(bottom = 32.dp)
+            .navigationBarsPadding()
+            .padding(bottom = 16.dp)
             .fillMaxWidth(0.85f)
             .clip(RoundedCornerShape(50))
             .background(if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF2F2F2))
@@ -426,24 +428,17 @@ fun HelpView(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            Icon(
+                painter = painterResource(id = R.drawable.ic_chevron_left),
+                contentDescription = "Back",
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(if (isDarkTheme) Color(0xFF3A3A3A) else Color(0xFFE5E5E5))
+                    .size(28.dp)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null
                     ) { onBack() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_chevron_left),
-                    contentDescription = "Back",
-                    modifier = Modifier.size(20.dp),
-                    tint = textColor
-                )
-            }
+                tint = textColor
+            )
             Box(
                 modifier = Modifier
                     .width(1.dp)
@@ -451,10 +446,10 @@ fun HelpView(
                     .background(secondaryText.copy(alpha = 0.2f))
             )
             Icon(
-                painter = painterResource(id = R.drawable.ic_info), // Representing Report (!)
+                painter = painterResource(id = R.drawable.ic_report_pill),
                 contentDescription = "Report",
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(28.dp)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null
@@ -471,7 +466,7 @@ fun HelpView(
                 painter = painterResource(id = R.drawable.ic_share),
                 contentDescription = "Share",
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(28.dp)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null

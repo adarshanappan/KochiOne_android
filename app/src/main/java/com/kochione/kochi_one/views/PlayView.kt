@@ -13,6 +13,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -69,7 +70,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import com.kochione.kochi_one.ui.components.ProgressiveImage
 import com.kochione.kochi_one.R
 import com.kochione.kochi_one.ui.components.SkeletonBox
 import com.kochione.kochi_one.models.DayHours
@@ -127,17 +128,16 @@ fun PlayView(
     var selectedCard by remember { mutableStateOf<PlayCardData?>(null) }
     var selectedVenue by remember { mutableStateOf<PlayVenue?>(null) }
 
-    androidx.compose.runtime.LaunchedEffect(selectedCard, selectedVenue) {
-        onDetailVisibilityChanged(selectedCard != null || selectedVenue != null)
-    }
-
     DisposableEffect(selectedCard, selectedVenue) {
         if (selectedCard != null || selectedVenue != null) {
             onRegisterDismissDetail {
                 if (selectedVenue != null) {
                     selectedVenue = null
+                    // If closing the venue, we're still looking at the card detail
+                    onDetailVisibilityChanged(selectedCard != null)
                 } else {
                     selectedCard = null
+                    onDetailVisibilityChanged(false)
                 }
             }
         } else {
@@ -155,7 +155,7 @@ fun PlayView(
                 .background(bgColor),
             contentPadding = PaddingValues(
                 top = 16.dp,
-                bottom = 88.dp,
+                bottom = 140.dp,
                 start = ScreenPaddingH,
                 end = ScreenPaddingH
             ),
@@ -193,7 +193,10 @@ fun PlayView(
                                 modifier = Modifier
                                     .weight(0.50f)
                                     .fillMaxHeight(),
-                                onCardClick = { selectedCard = hero }
+                                onCardClick = { 
+                                    selectedCard = hero 
+                                    onDetailVisibilityChanged(true)
+                                }
                             )
                             Column(
                                 modifier = Modifier
@@ -206,14 +209,20 @@ fun PlayView(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f),
-                                    onCardClick = { selectedCard = stackTop }
+                                    onCardClick = { 
+                                        selectedCard = stackTop 
+                                        onDetailVisibilityChanged(true)
+                                    }
                                 )
                                 PlayFeatureCard(
                                     card = stackBottom,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f),
-                                    onCardClick = { selectedCard = stackBottom }
+                                    onCardClick = { 
+                                        selectedCard = stackBottom 
+                                        onDetailVisibilityChanged(true)
+                                    }
                                 )
                             }
                         }
@@ -224,7 +233,10 @@ fun PlayView(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(172.dp),
-                                onCardClick = { selectedCard = card }
+                                onCardClick = { 
+                                    selectedCard = card 
+                                    onDetailVisibilityChanged(true)
+                                }
                             )
                         }
                     }
@@ -237,16 +249,27 @@ fun PlayView(
                 .zIndex(2f),
             targetState = selectedCard,
             transitionSpec = {
-                ContentTransform(
-                    targetContentEnter = slideInHorizontally(
+                if (targetState != null) {
+                    (androidx.compose.animation.slideInHorizontally(
                         initialOffsetX = { fullWidth -> fullWidth },
-                        animationSpec = tween(durationMillis = 280)
-                    ),
-                    initialContentExit = slideOutHorizontally(
+                        animationSpec = tween(durationMillis = 300)
+                    ) togetherWith androidx.compose.animation.slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> -fullWidth },
+                        animationSpec = tween(durationMillis = 300)
+                    )).apply {
+                        targetContentZIndex = 1f
+                    }
+                } else {
+                    (androidx.compose.animation.slideInHorizontally(
+                        initialOffsetX = { fullWidth -> -fullWidth },
+                        animationSpec = tween(durationMillis = 300)
+                    ) togetherWith androidx.compose.animation.slideOutHorizontally(
                         targetOffsetX = { fullWidth -> fullWidth },
-                        animationSpec = tween(durationMillis = 260)
-                    )
-                )
+                        animationSpec = tween(durationMillis = 300)
+                    )).apply {
+                        targetContentZIndex = -1f
+                    }
+                }
             },
             label = "play-details-transition"
         ) { card ->
@@ -424,7 +447,7 @@ private fun PlayFeatureCard(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    AsyncImage(
+                    ProgressiveImage(
                         model = card.imageUrl,
                         contentDescription = card.title,
                         modifier = Modifier.fillMaxSize(),
@@ -517,10 +540,11 @@ private fun PlayVenueFullScreenSheet(
                                 ) {
                                     val logo = venue.logo?.url
                                     if (!logo.isNullOrBlank()) {
-                AsyncImage(
+                                        ProgressiveImage(
+                                            showLoadingCircle = true,
                                             model = logo,
                                             contentDescription = venue.name,
-                    modifier = Modifier.fillMaxSize(),
+                                            modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop
                                         )
                                     } else {
@@ -599,7 +623,8 @@ private fun PlayVenueFullScreenSheet(
                         if (displayedCoverUrls.isNotEmpty()) {
                             if (displayedCoverUrls.size == 2) {
                                 Row(modifier = Modifier.fillMaxWidth().height(120.dp)) {
-                                    AsyncImage(
+                                    ProgressiveImage(
+                                        showLoadingCircle = true,
                                         model = displayedCoverUrls[0],
                                         contentDescription = venue.name,
                                         modifier = Modifier
@@ -609,7 +634,8 @@ private fun PlayVenueFullScreenSheet(
                                         contentScale = ContentScale.Crop
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    AsyncImage(
+                                    ProgressiveImage(
+                                        showLoadingCircle = true,
                                         model = displayedCoverUrls[1],
                                         contentDescription = venue.name,
                                         modifier = Modifier
@@ -630,7 +656,8 @@ private fun PlayVenueFullScreenSheet(
                                                 .background(imageSlotBg)
                                         ) {
                                             if (displayedCoverUrls.isNotEmpty()) {
-                                                AsyncImage(
+                                                ProgressiveImage(
+                                                    showLoadingCircle = true,
                                                     model = displayedCoverUrls[0],
                                                     contentDescription = venue.name,
                                                     modifier = Modifier.fillMaxSize(),
@@ -647,7 +674,8 @@ private fun PlayVenueFullScreenSheet(
                                                 .background(imageSlotBg)
                                         ) {
                                             if (displayedCoverUrls.size > 1) {
-                                                AsyncImage(
+                                                ProgressiveImage(
+                                                    showLoadingCircle = true,
                                                     model = displayedCoverUrls[1],
                                                     contentDescription = venue.name,
                                                     modifier = Modifier.fillMaxSize(),
@@ -666,7 +694,8 @@ private fun PlayVenueFullScreenSheet(
                                                 .background(imageSlotBg)
                                         ) {
                                             if (displayedCoverUrls.size > 2) {
-                                                AsyncImage(
+                                                ProgressiveImage(
+                                                    showLoadingCircle = true,
                                                     model = displayedCoverUrls[2],
                                                     contentDescription = venue.name,
                                                     modifier = Modifier.fillMaxSize(),
@@ -683,7 +712,8 @@ private fun PlayVenueFullScreenSheet(
                                                 .background(imageSlotBg)
                                         ) {
                                             if (displayedCoverUrls.size > 3) {
-                                                AsyncImage(
+                                                ProgressiveImage(
+                                                    showLoadingCircle = true,
                                                     model = displayedCoverUrls[3],
                                                     contentDescription = venue.name,
                                                     modifier = Modifier.fillMaxSize(),
@@ -1133,7 +1163,7 @@ private fun SnookerCardContent(card: PlayCardData) {
         modifier = Modifier.fillMaxSize()
     ) {
         if (hasBackendImage) {
-            AsyncImage(
+            ProgressiveImage(
                 model = card.imageUrl,
                 contentDescription = card.title,
                 modifier = Modifier.fillMaxSize(),
@@ -1262,7 +1292,7 @@ private fun GameCentreCardContent(card: PlayCardData) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (hasBackendImage) {
-            AsyncImage(
+            ProgressiveImage(
                 model = card.imageUrl,
                 contentDescription = card.title,
                 modifier = Modifier.fillMaxSize(),
