@@ -1,9 +1,14 @@
 package com.kochione.kochi_one.views
 
+import android.content.Context
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,24 +20,58 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
+import coil.compose.AsyncImage
 import com.kochione.kochi_one.R
 
+// Removed local CountryCode definitions, now using ProfileManager.CountryCode
+
 @Composable
-fun ProfileEditView(isDarkTheme: Boolean = false, onBack: () -> Unit, onSave: () -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var mobile by remember { mutableStateOf("") }
+fun ProfileEditView(isDarkTheme: Boolean = false, onBack: () -> Unit, onSave: () -> Unit, onReport: () -> Unit = {}) {
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("kochi_one_prefs", Context.MODE_PRIVATE) }
+
+    val snapshot = remember { com.kochione.kochi_one.utils.ProfileManager.snapshot() }
     
-    val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFECEEF1)
-    val textFieldBg = if (isDarkTheme) Color(0xFF2C2C2C) else Color.White
+    var name by remember { mutableStateOf(snapshot.username) }
+    var mobile by remember { mutableStateOf(snapshot.mobile) }
+    var imageData by remember { mutableStateOf(snapshot.imageData) }
+    
+    var selectedCountryCode by remember { 
+        val savedCode = snapshot.countryCode
+        mutableStateOf(com.kochione.kochi_one.utils.ProfileManager.countryCodes.find { it.code == savedCode } ?: com.kochione.kochi_one.utils.ProfileManager.countryCodes[0])
+    }
+    
+    val coroutineScope = rememberCoroutineScope()
+    val deviceId = remember { android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID) ?: "unknown_device" }
+
+    var expandedCountryDropdown by remember { mutableStateOf(false) }
+
+    var cropImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            cropImageUri = uri
+        }
+    }
+    
+    val bgColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color.White
+    val textFieldBg = if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF0F2F5)
     val labelColor = if (isDarkTheme) Color.White.copy(alpha = 0.6f) else Color.Gray
     val textColor = if (isDarkTheme) Color.White else Color.Black
-    val bottomBarBg = if (isDarkTheme) Color(0xFF2C2C2C).copy(alpha = 0.95f) else Color(0xFFF0F2F5).copy(alpha = 0.95f)
-    val dividerColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.5f)
-    val iconTint = if (isDarkTheme) Color.White else Color.DarkGray
+    val dividerColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.2f)
+    
+    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+
+    var showReportDialog by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
     Box(
         modifier = Modifier
@@ -42,6 +81,7 @@ fun ProfileEditView(isDarkTheme: Boolean = false, onBack: () -> Unit, onSave: ()
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(scrollState)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -57,12 +97,21 @@ fun ProfileEditView(isDarkTheme: Boolean = false, onBack: () -> Unit, onSave: ()
                     shape = CircleShape,
                     color = Color(0xFFFFD54F) // Yellow background matching screenshot
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.profile_image),
-                        contentDescription = "Profile Image",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
+                    if (imageData != null) {
+                        AsyncImage(
+                            model = imageData,
+                            contentDescription = "Profile Image",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.profile_image),
+                            contentDescription = "Profile Image",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 }
 
                 // Camera Edit Button
@@ -70,7 +119,7 @@ fun ProfileEditView(isDarkTheme: Boolean = false, onBack: () -> Unit, onSave: ()
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .clickable { /* Handle photo edit */ },
+                        .clickable { imagePickerLauncher.launch("image/*") },
                     color = Color(0xFF007AFF), // Blue matching screenshot
                     shape = CircleShape,
                     tonalElevation = 4.dp
@@ -145,24 +194,64 @@ fun ProfileEditView(isDarkTheme: Boolean = false, onBack: () -> Unit, onSave: ()
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Country Code Selector
-                        Row(
-                            modifier = Modifier
-                                .padding(start = 24.dp)
-                                .clickable { /* Open country selector */ },
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "+91",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color(0xFF007AFF),
-                                fontWeight = FontWeight.Medium
-                            )
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = Color(0xFF007AFF),
-                                modifier = Modifier.size(20.dp)
-                            )
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .padding(start = 24.dp)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = null
+                                    ) { expandedCountryDropdown = true },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = selectedCountryCode.code,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color(0xFF007AFF),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = Color(0xFF007AFF),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            MaterialTheme(
+                                shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(24.dp))
+                            ) {
+                                DropdownMenu(
+                                    expanded = expandedCountryDropdown,
+                                    onDismissRequest = { expandedCountryDropdown = false },
+                                    modifier = Modifier
+                                        .background(if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF4F5F8))
+                                        .heightIn(max = 500.dp)
+                                        .width(260.dp)
+                                ) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    com.kochione.kochi_one.utils.ProfileManager.countryCodes.forEach { country ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable(
+                                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                                    indication = null
+                                                ) {
+                                                    selectedCountryCode = country
+                                                    expandedCountryDropdown = false
+                                                }
+                                                .padding(horizontal = 24.dp, vertical = 12.dp)
+                                        ) {
+                                            Text(
+                                                text = "${country.name} (${country.code})", 
+                                                color = textColor,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                            }
                         }
 
                         VerticalDivider(
@@ -190,48 +279,149 @@ fun ProfileEditView(isDarkTheme: Boolean = false, onBack: () -> Unit, onSave: ()
                     }
                 }
             }
+            
+            Spacer(modifier = Modifier.height(100.dp)) // Extra space for bottom nav
         }
 
         // --- Bottom Action Bar ---
-        Surface(
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 40.dp)
-                .width(280.dp)
-                .height(72.dp),
-            shape = RoundedCornerShape(36.dp),
-            color = bottomBarBg,
-            tonalElevation = 8.dp,
-            shadowElevation = 12.dp
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(bottom = 16.dp)
+                .fillMaxWidth(0.85f)
+                .clip(RoundedCornerShape(50))
+                .background(if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF2F2F2))
+                .padding(horizontal = 24.dp, vertical = 18.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Save
-                IconButton(onClick = onSave) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_check),
-                        contentDescription = "Save",
-                        modifier = Modifier.size(28.dp),
-                        tint = iconTint
-                    )
-                }
-
-                VerticalDivider(
-                    modifier = Modifier.height(32.dp),
-                    color = dividerColor
+                // Back Icon
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_chevron_left),
+                    contentDescription = "Back",
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) { onBack() },
+                    tint = textColor
                 )
 
-                // Info
-                IconButton(onClick = { /* Handle Info */ }) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_info),
-                        contentDescription = "Info",
-                        modifier = Modifier.size(28.dp),
-                        tint = iconTint
+                Box(modifier = Modifier.width(1.dp).height(20.dp).background(dividerColor))
+
+                // Save / Tick Mark
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_check),
+                    contentDescription = "Save",
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            com.kochione.kochi_one.utils.ProfileManager.updateAndSyncToBackend(
+                                context = context,
+                                username = name,
+                                mobile = mobile,
+                                imageData = imageData,
+                                countryCode = selectedCountryCode.code
+                            )
+                            onSave()
+                        },
+                    tint = textColor
+                )
+
+                Box(modifier = Modifier.width(1.dp).height(20.dp).background(dividerColor))
+
+                // Report Icon
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_report_pill),
+                    contentDescription = "Report",
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) { showReportDialog = true },
+                    tint = textColor
+                )
+            }
+        } // Closes the bottom action bar Box
+    } // Closes main Box
+
+    if (cropImageUri != null) {
+        ImageCropView(
+            uri = cropImageUri!!,
+            isDarkTheme = isDarkTheme,
+            onCancel = { cropImageUri = null },
+            onCropSuccess = { croppedUri ->
+                imageData = croppedUri
+                cropImageUri = null
+                // Optional: instantly update global manager so other parts of the app show the change
+                com.kochione.kochi_one.utils.ProfileManager.updateProfileImage(context, croppedUri)
+            }
+        )
+    }
+
+    if (showReportDialog) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showReportDialog = false }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF2F2F2))
+                    .padding(24.dp)
+            ) {
+                Column {
+                    Text(
+                        text = "Report an issue",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Open the report form to send feedback or report a problem.",
+                        color = textColor.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(if (isDarkTheme) Color(0xFF444444) else Color(0xFFE5E5E5))
+                                .clickable { showReportDialog = false },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Cancel", color = textColor, fontWeight = FontWeight.Medium)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(if (isDarkTheme) Color(0xFF444444) else Color(0xFFE5E5E5))
+                                .clickable {
+                                    showReportDialog = false
+                                    onReport()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Report", color = textColor, fontWeight = FontWeight.Medium)
+                        }
+                    }
                 }
             }
         }

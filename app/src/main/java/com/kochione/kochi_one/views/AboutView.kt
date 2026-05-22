@@ -289,14 +289,15 @@ fun AboutView(
                 }
             }
 
-            Spacer(modifier = Modifier.height(120.dp))
+            Spacer(modifier = Modifier.height(160.dp))
         }
 
         // Bottom floating pill with Back, Report, and Share
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp)
                 .fillMaxWidth(0.85f)
                 .clip(RoundedCornerShape(50))
                 .background(if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF2F2F2))
@@ -307,30 +308,23 @@ fun AboutView(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_chevron_left),
+                    contentDescription = "Back",
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(if (isDarkTheme) Color(0xFF3A3A3A) else Color(0xFFE5E5E5))
+                        .size(28.dp)
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null
                         ) { onBack() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_chevron_left),
-                        contentDescription = "Back",
-                        modifier = Modifier.size(20.dp),
-                        tint = textColor
-                    )
-                }
+                    tint = textColor
+                )
                 Box(modifier = Modifier.width(1.dp).height(20.dp).background(secondaryText.copy(alpha = 0.2f)))
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_info),
+                    painter = painterResource(id = R.drawable.ic_report_pill),
                     contentDescription = "Report",
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(28.dp)
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null
@@ -342,7 +336,7 @@ fun AboutView(
                     painter = painterResource(id = R.drawable.ic_share),
                     contentDescription = "Share",
                     modifier = Modifier
-                        .size(24.dp)
+                        .size(28.dp)
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null

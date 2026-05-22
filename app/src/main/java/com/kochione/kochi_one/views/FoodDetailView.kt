@@ -87,7 +87,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.AsyncImage
+import com.kochione.kochi_one.ui.components.ProgressiveImage
 import com.kochione.kochi_one.R
 import com.kochione.kochi_one.models.DayHours
 import com.kochione.kochi_one.models.Restaurant
@@ -217,7 +217,7 @@ fun FoodDetailView(
                         .weight(1f)
                         .fillMaxWidth()
                 ) { page ->
-                    AsyncImage(
+                    ProgressiveImage(
                         model = images[page],
                         contentDescription = "Restaurant photo ${page + 1}",
                         modifier = Modifier.fillMaxSize(),
@@ -262,7 +262,7 @@ fun FoodDetailView(
                                     }
                                 }
                         ) {
-                            AsyncImage(
+                            ProgressiveImage(
                                 model = url,
                                 contentDescription = "Thumbnail ${index + 1}",
                                 modifier = Modifier
@@ -283,7 +283,7 @@ fun FoodDetailView(
                 .fillMaxSize()
                 .background(pageBg)
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 100.dp)
+                .padding(bottom = 140.dp)
         ) {
             FoodDetailTopSection(restaurant = restaurant, isDarkTheme = isDarkTheme)
             FoodDetailStatsRow(restaurant = restaurant, isDarkTheme = isDarkTheme)
@@ -346,7 +346,7 @@ fun FoodDetailTopSection(
             .fillMaxWidth()
             .height(420.dp)
     ) {
-        AsyncImage(
+        ProgressiveImage(
             model = restaurant.coverImages.firstOrNull()?.url ?: restaurant.logo?.url,
             contentDescription = restaurant.name,
             modifier = Modifier.fillMaxSize(),
@@ -373,7 +373,7 @@ fun FoodDetailTopSection(
                 .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
+            ProgressiveImage(
                 model = restaurant.logo?.url ?: restaurant.coverImages.firstOrNull()?.url,
                 contentDescription = "${restaurant.name} logo",
                 modifier = Modifier
@@ -467,7 +467,7 @@ private fun FoodDetailGallerySection(
                 },
                 label = "gallery_image_transition"
             ) { index ->
-                AsyncImage(
+                ProgressiveImage(
                     model = images[index],
                     contentDescription = "Restaurant photo ${index + 1}",
                     modifier = Modifier.fillMaxSize(),
@@ -594,7 +594,7 @@ private fun FoodDetailGallerySection(
                                 indication = null
                             ) { onSelectedIndexChange(index) }
                     ) {
-                        AsyncImage(
+                        ProgressiveImage(
                             model = imageUrl,
                             contentDescription = "Thumbnail ${index + 1}",
                             modifier = Modifier
@@ -1000,7 +1000,7 @@ private fun FeatureRow(feature: String, isDarkTheme: Boolean) {
             .padding(vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AsyncImage(
+        ProgressiveImage(
             model = featureIconRes(feature),
             contentDescription = feature,
             modifier = Modifier.size(28.dp),
@@ -1197,8 +1197,8 @@ fun FoodDetailActionBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 24.dp)
             .navigationBarsPadding()
+            .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 16.dp)
     ) {
         Row(
             modifier = Modifier

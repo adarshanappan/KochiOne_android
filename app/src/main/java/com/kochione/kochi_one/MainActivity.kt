@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -59,11 +60,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,6 +93,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Velocity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -130,26 +133,18 @@ import com.kochione.kochi_one.views.ProfileEditView
 import com.kochione.kochi_one.views.ProfileView
 import com.kochione.kochi_one.views.ReportView
 import com.kochione.kochi_one.views.TransitView
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
-import org.json.JSONObject
 import kotlin.math.abs
 
-private const val OPENAI_API_KEY =
-    "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"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.decorView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         enableEdgeToEdge()
+        window.decorView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        com.kochione.kochi_one.utils.ProfileManager.initialize(this)
+        com.kochione.kochi_one.utils.ProfileManager.ensureSyncedWithBackend(this)
         setContent {
             val context = androidx.compose.ui.platform.LocalContext.current
             val systemDark = isSystemInDarkTheme()
@@ -204,7 +199,10 @@ class MainActivity : ComponentActivity() {
                 position = com.google.android.gms.maps.model.CameraPosition.fromLatLngZoom(kochiLocation, 12f)
             }
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            val profileScrollState = androidx.compose.foundation.rememberScrollState()
+
+            androidx.compose.runtime.CompositionLocalProvider(com.kochione.kochi_one.views.LocalProfileScrollState provides profileScrollState) {
+                Box(modifier = Modifier.fillMaxSize()) {
                 // Base Layer (Always there)
                 KochiOneTheme(darkTheme = isDarkTheme) {
                     MainScreen(
@@ -334,8 +332,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-
-
+            }
             }
         }
     }
@@ -380,13 +377,8 @@ fun MainScreen(
         KmrlOpenData.load(context)
     }
 
-    // Time-based theme: morning (6:00 AM – 6:30 PM) = light map + dark sheet, night = dark everything
-    val calendar = java.util.Calendar.getInstance()
-    val currentHour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
-    val currentMinute = calendar.get(java.util.Calendar.MINUTE)
-    val isMorningTime = currentHour in 6..17 || (currentHour == 18 && currentMinute < 30) // 6:00 AM to 6:29 PM
-    val mapIsDark = if (isAutomatic) !isMorningTime else isDarkTheme
-    val sheetIsDark = if (isAutomatic) true else isDarkTheme
+    val mapIsDark = isDarkTheme
+    val sheetIsDark = isDarkTheme
 
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -534,10 +526,15 @@ fun MainScreen(
     val coroutineScope = rememberCoroutineScope()
 
     BackHandler {
+        if (playOrFitnessDetailOpen) {
+            dismissPlayFitnessDetail?.invoke()
+            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
+            return@BackHandler
+        }
         when (selectedTab) {
             "Chat" -> {
                 onTabSelected("Explore")
-                coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
             }
             "ProfileEdit", "Liked", "Saved", "Report", "Help", "About" -> {
                 // Sub-screens of Profile → go back to Profile
@@ -546,12 +543,12 @@ fun MainScreen(
             "Profile" -> {
                 // Profile root → go back to Explore and collapse sheet
                 onTabSelected("Explore")
-                coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
             }
             else -> {
                 if (sheetHeightPx.value > halfExpandedHeightPx + 20f) {
                     coroutineScope.launch {
-                        sheetHeightPx.animateTo(halfExpandedHeightPx)
+                        sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300))
                     }
                 } else if (selectedTab != "Explore") {
                     onTabSelected("Explore")
@@ -824,6 +821,164 @@ fun MainScreen(
                         )
                     )
             )
+
+            var showSosDialog by remember { mutableStateOf(false) }
+            val glassColor = if (sheetIsDark) Color(0xFF1E1E1E).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.7f)
+            val glassBorder = if (sheetIsDark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.1f)
+            val iconTint = if (sheetIsDark) Color.White else Color.Black
+
+            // SOS Capsule
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !isSheetExpanded,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 16.dp, top = 61.dp)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, -sheetHeightPx.value.toInt() * 0) }, // Float cleanly
+                enter = androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.fadeOut()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (sheetIsDark) Color(0xFF2C2C2C).copy(alpha = 0.9f) else Color.White.copy(alpha = 0.9f))
+                        .border(1.dp, glassBorder, RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) { showSosDialog = true }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "SOS",
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF3B30),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+
+            if (showSosDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSosDialog = false },
+                    title = {
+                        Text(text = "Emergency Helplines", fontWeight = FontWeight.Bold)
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val callAction = { number: String ->
+                                val intent = android.content.Intent(android.content.Intent.ACTION_DIAL).apply {
+                                    data = android.net.Uri.parse("tel:$number")
+                                }
+                                context.startActivity(intent)
+                            }
+                            
+                            @Composable
+                            fun SosGridItem(title: String, number: String, icon: @Composable () -> Unit) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1f) // Makes the card square
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(if (sheetIsDark) Color(0xFF333333) else Color(0xFFE5E5EA))
+                                        .clickable(
+                                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                            indication = null
+                                        ) { callAction(number) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(64.dp)
+                                                .clip(CircleShape)
+                                                .background(if (sheetIsDark) Color(0xFF444444) else Color(0xFFD1D1D6)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            icon()
+                                        }
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            text = "Call\n$title", 
+                                            fontWeight = FontWeight.SemiBold, 
+                                            fontSize = 15.sp,
+                                            lineHeight = 22.sp,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                            color = if (sheetIsDark) Color.White else Color(0xFF2C2C2E)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    SosGridItem("Police", "100") {
+                                        Icon(
+                                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_sos_police),
+                                            contentDescription = "Police",
+                                            tint = if (sheetIsDark) Color.White else Color(0xFF2C2C2E),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                }
+                                Box(modifier = Modifier.weight(1f)) {
+                                    SosGridItem("Ambulance", "108") {
+                                        Icon(
+                                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_sos_ambulance),
+                                            contentDescription = "Ambulance",
+                                            tint = if (sheetIsDark) Color.White else Color(0xFF2C2C2E),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            /*
+                            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    SosGridItem("Fire Force", "101") {
+                                        Icon(
+                                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_fire_custom),
+                                            contentDescription = "Fire Force",
+                                            tint = if (sheetIsDark) Color.White else Color(0xFF2C2C2E),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                }
+                                Box(modifier = Modifier.weight(1f)) {
+                                    SosGridItem("Women Help", "1091") {
+                                        Icon(
+                                            painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_women_help),
+                                            contentDescription = "Women Help",
+                                            tint = if (sheetIsDark) Color.White else Color(0xFF2C2C2E),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            */
+                        }
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.Button(
+                            onClick = { showSosDialog = false },
+                            shape = CircleShape,
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = if (sheetIsDark) Color(0xFF444444) else Color(0xFFE5E5EA),
+                                contentColor = if (sheetIsDark) Color.White else Color.Black
+                            )
+                        ) {
+                            Text("Close", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    containerColor = if (sheetIsDark) Color(0xFF2C2C2C) else Color.White,
+                    titleContentColor = iconTint,
+                    textContentColor = iconTint
+                )
+            }
             
             // Custom Location Button hovering above the bottom sheet
 //            if (hasLocationPermission) {
@@ -1182,6 +1337,7 @@ fun ThreeStateBottomSheet(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
+    val profileImageUri by com.kochione.kochi_one.utils.ProfileManager.profileImageFlow.collectAsState()
 
     // isDarkTheme here = sheetIsDark (always dark when automatic).
     // Compute the true effective theme for ProfileView (respects system + user choice).
@@ -1198,103 +1354,17 @@ fun ThreeStateBottomSheet(
     val bottomNavReservedHeight = 72.dp
 
     // ── AI-powered cycling suggestions ─────────────────────────────────────
-    val fallbackSuggestions = remember {
-        listOf(
-            "Best breakfast spots",
-            "Metro timings",
-            "Hidden gems in Kochi",
-            "Gyms near me",
-            "Things to do tonight",
-            "Fort Kochi walks",
-            "Best cafes",
-            "Backwater cruises"
-        )
-    }
-    var aiSuggestions by remember { mutableStateOf(fallbackSuggestions) }
+    var aiSuggestions by remember { mutableStateOf(com.kochione.kochi_one.utils.MessageSuggestionSets.forTab(selectedTab)) }
     var currentSuggestionIndex by remember { mutableStateOf(0) }
     val suggestionAlpha = remember { Animatable(1f) }
 
-    LaunchedEffect(Unit) {
-        // 1. Fetch suggestions from OpenAI in background
-        try {
-            val fetched = withContext(Dispatchers.IO) {
-                val client = OkHttpClient.Builder()
-                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    .build()
-                val reqJson = JSONObject().apply {
-                    put("model", "gpt-4o-mini")
-                    put("messages", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("role", "system")
-                            put("content", "You are a helpful assistant. Always respond with valid JSON only, no markdown, no code fences.")
-                        })
-                        put(JSONObject().apply {
-                            put("role", "user")
-                            put("content",
-                                "Generate 8 short search suggestions (2-4 words each) " +
-                                "for a Kochi city guide app covering food, fitness, " +
-                                "entertainment, beaches, cafes, transit. " +
-                                "Respond with ONLY a raw JSON array of strings like: " +
-                                "[\"suggestion1\",\"suggestion2\"]")
-                        })
-                    })
-                    put("max_tokens", 200)
-                    // Force JSON response on supported models
-                    put("response_format", JSONObject().apply { put("type", "json_object") })
-                }
-                val body = reqJson.toString()
-                    .toRequestBody("application/json".toMediaType())
-                val request = Request.Builder()
-                    .url("https://api.openai.com/v1/chat/completions")
-                    .addHeader("Authorization", "Bearer $OPENAI_API_KEY")
-                    .addHeader("Content-Type", "application/json")
-                    .post(body)
-                    .build()
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val rawBody = response.body?.string() ?: return@use null
-                        val respJson = JSONObject(rawBody)
-                        val content = respJson
-                            .getJSONArray("choices")
-                            .getJSONObject(0)
-                            .getJSONObject("message")
-                            .getString("content")
-                            .trim()
+    LaunchedEffect(selectedTab) {
+        // Reset state on tab change
+        aiSuggestions = com.kochione.kochi_one.utils.MessageSuggestionSets.forTab(selectedTab)
+        currentSuggestionIndex = 0
+        suggestionAlpha.snapTo(1f)
 
-                        // Strip markdown code fences if present (```json ... ```)
-                        val cleaned = content
-                            .removePrefix("```json")
-                            .removePrefix("```")
-                            .removeSuffix("```")
-                            .trim()
-
-                        // Try to parse as JSON array directly
-                        val arr: JSONArray? = try {
-                            // If model returned {"suggestions": [...]} or similar wrapper
-                            if (cleaned.startsWith("{")) {
-                                val obj = JSONObject(cleaned)
-                                // Grab the first array value found
-                                obj.keys().asSequence()
-                                    .mapNotNull { key -> runCatching { obj.getJSONArray(key) }.getOrNull() }
-                                    .firstOrNull()
-                            } else {
-                                JSONArray(cleaned)
-                            }
-                        } catch (_: Exception) {
-                            // Last resort: regex-extract [...] block
-                            val match = Regex("\\[[^\\[\\]]+\\]").find(cleaned)
-                            match?.let { runCatching { JSONArray(it.value) }.getOrNull() }
-                        }
-
-                        arr?.let { a -> (0 until a.length()).map { a.getString(it) } }
-                    } else null
-                }
-            }
-            if (!fetched.isNullOrEmpty()) aiSuggestions = fetched
-        } catch (_: Exception) { /* keep fallback */ }
-
-        // 2. Cycle through suggestions with fade in/out every 3 seconds
+        // Cycle through suggestions with fade in/out every 3 seconds
         while (true) {
             delay(3000L)
             suggestionAlpha.animateTo(0f, tween(350))
@@ -1320,26 +1390,103 @@ fun ThreeStateBottomSheet(
         onRegisterDismissDetail(null)
     }
 
-    val nestedScrollConnection = remember(expandedHeightPx, halfExpandedHeightPx, collapsedHeightPx) {
+    val isFullScreenTab = selectedTab in listOf(
+        "Profile", "ProfileEdit", "Liked", "Saved", "Report", "Help", "About", "Chat"
+    )
+
+    // LaunchedEffect for isFullScreenTab removed to prevent double-jump animation. 
+    // Sheet expansion is now handled explicitly on click.
+
+    val nestedScrollConnection = remember(expandedHeightPx, halfExpandedHeightPx, collapsedHeightPx, isFullScreenTab) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (isFullScreenTab) return Offset.Zero
                 // If scrolling up (available.y < 0) and sheet is not fully expanded, expand it first!
                 if (available.y < 0 && sheetHeightPx.value < expandedHeightPx) {
-                    if (sheetHeightPx.targetValue != expandedHeightPx) {
-                        coroutineScope.launch {
-                            sheetHeightPx.animateTo(expandedHeightPx)
-                        }
+                    val newHeight = (sheetHeightPx.value - available.y).coerceAtMost(expandedHeightPx)
+                    val consumedY = sheetHeightPx.value - newHeight // Since available.y is negative, newHeight is > value, consumed is negative
+                    coroutineScope.launch {
+                        sheetHeightPx.snapTo(newHeight)
                     }
-                    // Consume the scroll so the list doesn't scroll until the sheet is fully expanded
-                    return Offset(0f, available.y)
+                    return Offset(0f, consumedY)
                 }
                 return Offset.Zero
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                // Let detectVerticalDragGestures handle the unconsumed downward scroll.
-                // Doing animateTo here conflicts with smooth touch tracking.
+                if (isFullScreenTab) return Offset.Zero
+                if (available.y > 0 && sheetHeightPx.value > collapsedHeightPx) {
+                    // Unconsumed downward scroll (list is at top).
+                    val newHeight = (sheetHeightPx.value - available.y).coerceAtLeast(collapsedHeightPx)
+                    val consumedY = sheetHeightPx.value - newHeight // Positive
+                    coroutineScope.launch {
+                        sheetHeightPx.snapTo(newHeight)
+                    }
+                    return Offset(0f, consumedY)
+                }
                 return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (isFullScreenTab) return Velocity.Zero
+                
+                val currentHeight = sheetHeightPx.value
+                
+                // Only intercept UPWARD flings in onPreFling (finger moving up, available.y < 0)
+                // This allows the sheet to expand before the list tries to scroll past its bottom.
+                if (available.y < -100f && currentHeight < expandedHeightPx - 1f) {
+                    val targetHeight = if (currentHeight < halfExpandedHeightPx - 50f) {
+                        halfExpandedHeightPx
+                    } else {
+                        expandedHeightPx
+                    }
+                    if (sheetHeightPx.targetValue != targetHeight) {
+                        coroutineScope.launch { sheetHeightPx.animateTo(targetHeight, androidx.compose.animation.core.tween(300)) }
+                    }
+                    return Velocity(0f, available.y)
+                }
+                
+                // For downward flings (available.y > 0) or low velocity, we let the scrollable list 
+                // consume what it needs first. We'll handle any leftover velocity in onPostFling.
+                return Velocity.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (isFullScreenTab) return Velocity.Zero
+                
+                val currentHeight = sheetHeightPx.value
+                val diffExpanded = abs(currentHeight - expandedHeightPx)
+                val diffHalf = abs(currentHeight - halfExpandedHeightPx)
+                val diffCollapsed = abs(currentHeight - collapsedHeightPx)
+                
+                // If there's unconsumed downward velocity (finger moving down, available.y > 0)
+                // This means the list is at the top, so we can collapse the sheet.
+                if (available.y > 100f) {
+                    val targetHeight = if (currentHeight > halfExpandedHeightPx + 50f) {
+                        halfExpandedHeightPx
+                    } else {
+                        collapsedHeightPx
+                    }
+                    if (sheetHeightPx.targetValue != targetHeight) {
+                        coroutineScope.launch { sheetHeightPx.animateTo(targetHeight, androidx.compose.animation.core.tween(300)) }
+                    }
+                    return Velocity(0f, available.y)
+                }
+                
+                // If there's no significant velocity left, just snap to the nearest state to keep it stable
+                if (abs(available.y) <= 100f) {
+                    val targetHeight = when {
+                        diffExpanded <= diffHalf && diffExpanded <= diffCollapsed -> expandedHeightPx
+                        diffHalf <= diffExpanded && diffHalf <= diffCollapsed -> halfExpandedHeightPx
+                        else -> collapsedHeightPx
+                    }
+                    if (sheetHeightPx.targetValue != targetHeight) {
+                        coroutineScope.launch { sheetHeightPx.animateTo(targetHeight, androidx.compose.animation.core.tween(300)) }
+                    }
+                    return Velocity(0f, available.y)
+                }
+                
+                return Velocity.Zero
             }
         }
     }
@@ -1355,7 +1502,8 @@ fun ThreeStateBottomSheet(
                 }
             }
             .nestedScroll(nestedScrollConnection)
-            .pointerInput(Unit) {
+            .pointerInput(isFullScreenTab) {
+                if (isFullScreenTab) return@pointerInput
                 detectVerticalDragGestures(
                     onDragEnd = {
                         coroutineScope.launch {
@@ -1369,12 +1517,12 @@ fun ThreeStateBottomSheet(
                                 diffHalf <= diffExpanded && diffHalf <= diffCollapsed -> halfExpandedHeightPx
                                 else -> collapsedHeightPx
                             }
-                             sheetHeightPx.animateTo(targetHeight)
+                             sheetHeightPx.animateTo(targetHeight, androidx.compose.animation.core.tween(300))
                         }
                     },
                     onDragCancel = {
                         coroutineScope.launch {
-                            sheetHeightPx.animateTo(collapsedHeightPx)
+                            sheetHeightPx.animateTo(collapsedHeightPx, androidx.compose.animation.core.tween(300))
                         }
                     }
                 ) { change, dragAmount ->
@@ -1407,8 +1555,10 @@ fun ThreeStateBottomSheet(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null // No ripple for a cleaner feel
                     ) {
-                        coroutineScope.launch {
-                            sheetHeightPx.animateTo(halfExpandedHeightPx)
+                        if (!isFullScreenTab) {
+                            coroutineScope.launch {
+                                sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300))
+                            }
                         }
                     }
                     .padding(top = 16.dp, bottom = 8.dp),
@@ -1428,8 +1578,9 @@ fun ThreeStateBottomSheet(
                 AnimatedContent(
                     targetState = if (selectedTab == "Explore") activeExplorePost else null,
                     transitionSpec = {
-                        fadeIn(animationSpec = tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing))
-                            .togetherWith(fadeOut(animationSpec = tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing)))
+                        (fadeIn(animationSpec = tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                            togetherWith fadeOut(animationSpec = tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing)))
+                            .using(androidx.compose.animation.SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(400, easing = androidx.compose.animation.core.FastOutSlowInEasing) }))
                     },
                     label = "TopBarTransition"
                 ) { post ->
@@ -1519,108 +1670,153 @@ fun ThreeStateBottomSheet(
                                 selectedTab != "Report" &&
                                 selectedTab != "Help" &&
                                 selectedTab != "About",
-                            enter = fadeIn() + slideInVertically { -it },
-                            exit = fadeOut() + slideOutVertically { -it }
+                            enter = fadeIn() + slideInVertically { -it } + androidx.compose.animation.expandVertically(),
+                            exit = fadeOut() + slideOutVertically { -it } + androidx.compose.animation.shrinkVertically()
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Standard Search Bar Row (Shared Element Logic)
-                                var searchQuery by remember { mutableStateOf("") }
-
                                 val detailBar = playOrFitnessDetailOpen
                                 // Same height for back circle and search capsule in detail bar (and normal search bar)
                                 val searchBarCapsuleHeight = 50.dp
-                                if (detailBar) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(searchBarCapsuleHeight)
-                                            .clip(CircleShape)
-                                            .background(searchBarBgColor)
-                                            .clickable { dismissPlayFitnessDetail?.invoke() },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.ic_chevron_left),
-                                            contentDescription = "Back",
-                                            tint = textColor,
-                                            modifier = Modifier.size(24.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-
-                                val searchCapsuleHorizontalPadding =
-                                    if (detailBar) 8.dp else 0.dp
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(horizontal = searchCapsuleHorizontalPadding)
-                                        .height(searchBarCapsuleHeight)
-                                        .sharedBounds(
-                                            rememberSharedContentState(key = "top_bar_search"),
-                                            animatedVisibilityScope = this@AnimatedContent,
-                                            boundsTransform = { _, _ -> tween(400) }
-                                        )
-                                        .clip(RoundedCornerShape(25.dp))
-                                        .background(searchBarBgColor)
-                                        .clickable {
-                                            onTabSelected("Chat")
-                                            coroutineScope.launch {
-                                                sheetHeightPx.animateTo(expandedHeightPx)
-                                            }
-                                        },
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
+                                val outerAnimatedVisibilityScope = this@AnimatedContent
+                                
+                                androidx.compose.animation.AnimatedContent(
+                                    targetState = detailBar,
+                                    transitionSpec = {
+                                        if (targetState) {
+                                            androidx.compose.animation.slideInHorizontally(
+                                                initialOffsetX = { fullWidth -> fullWidth },
+                                                animationSpec = androidx.compose.animation.core.tween(300)
+                                            ) togetherWith androidx.compose.animation.slideOutHorizontally(
+                                                targetOffsetX = { fullWidth -> -fullWidth },
+                                                animationSpec = androidx.compose.animation.core.tween(300)
+                                            )
+                                        } else {
+                                            androidx.compose.animation.slideInHorizontally(
+                                                initialOffsetX = { fullWidth -> -fullWidth },
+                                                animationSpec = androidx.compose.animation.core.tween(300)
+                                            ) togetherWith androidx.compose.animation.slideOutHorizontally(
+                                                targetOffsetX = { fullWidth -> fullWidth },
+                                                animationSpec = androidx.compose.animation.core.tween(300)
+                                            )
+                                        }
+                                    },
+                                    label = "top_bar_detail_transition"
+                                ) { isDetail ->
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            painter = painterResource(id = R.drawable.ic_forum_outline),
-                                            contentDescription = "Chat",
-                                            tint = textColor,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(
-                                            text = aiSuggestions[currentSuggestionIndex],
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = textColor.copy(alpha = 0.6f),
-                                            modifier = Modifier.graphicsLayer {
-                                                alpha = suggestionAlpha.value
+                                        if (isDetail) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(searchBarCapsuleHeight)
+                                                    .clip(CircleShape)
+                                                    .background(searchBarBgColor)
+                                                    .clickable { 
+                                                        dismissPlayFitnessDetail?.invoke()
+                                                        coroutineScope.launch {
+                                                            sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300))
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(id = R.drawable.ic_chevron_left),
+                                                    contentDescription = "Back",
+                                                    tint = textColor,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
                                             }
-                                        )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
+
+                                        val searchCapsuleHorizontalPadding =
+                                            if (isDetail) 8.dp else 0.dp
+                                        
+                                        var searchBoxModifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = searchCapsuleHorizontalPadding)
+                                            .height(searchBarCapsuleHeight)
+                                            
+                                        if (!isDetail) {
+                                            searchBoxModifier = searchBoxModifier.sharedBounds(
+                                                rememberSharedContentState(key = "top_bar_search"),
+                                                animatedVisibilityScope = outerAnimatedVisibilityScope,
+                                                boundsTransform = { _, _ -> tween(400) }
+                                            )
+                                        }
+
+                                        searchBoxModifier = searchBoxModifier
+                                            .clip(RoundedCornerShape(25.dp))
+                                            .background(searchBarBgColor)
+                                            .clickable {
+                                                onTabSelected("Chat")
+                                                coroutineScope.launch {
+                                                    sheetHeightPx.animateTo(expandedHeightPx, androidx.compose.animation.core.tween(300))
+                                                }
+                                            }
+
+                                        Box(
+                                            modifier = searchBoxModifier,
+                                            contentAlignment = Alignment.CenterStart
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 16.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(id = R.drawable.ic_forum_outline),
+                                                    contentDescription = "Chat",
+                                                    tint = textColor,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text(
+                                                    text = aiSuggestions[currentSuggestionIndex],
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = textColor.copy(alpha = 0.6f),
+                                                    modifier = Modifier.graphicsLayer {
+                                                        alpha = suggestionAlpha.value
+                                                    }
+                                                )
+                                            }
+                                        }
+                                        
+                                        Spacer(modifier = Modifier.width(if (isDetail) 2.dp else 12.dp))
+                                        
+                                        // Profile Image
+                                        Box(
+                                            modifier = Modifier
+                                                .size(44.dp)
+                                                .clip(RoundedCornerShape(22.dp))
+                                                .background(MaterialTheme.colorScheme.primaryContainer)
+                                                .clickable { 
+                                                    onTabSelected("Profile")
+                                                    coroutineScope.launch {
+                                                        sheetHeightPx.animateTo(expandedHeightPx, androidx.compose.animation.core.tween(300))
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (profileImageUri != null) {
+                                                coil.compose.AsyncImage(
+                                                    model = profileImageUri,
+                                                    contentDescription = "Profile",
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            } else {
+                                                Image(
+                                                    painter = painterResource(id = R.drawable.profile_image),
+                                                    contentDescription = "Profile",
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            }
+                                        }
                                     }
                                 }
-                                
-                                Spacer(modifier = Modifier.width(if (detailBar) 2.dp else 12.dp))
-                                
-                                // Profile Image
-                                Box(
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(22.dp))
-                                        .background(MaterialTheme.colorScheme.primaryContainer)
-                                        .clickable { 
-                                            onTabSelected("Profile")
-                                            coroutineScope.launch {
-                                                sheetHeightPx.animateTo(expandedHeightPx)
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.profile_image),
-                                        contentDescription = "Profile",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -1631,9 +1827,14 @@ fun ThreeStateBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f) // Takes up remaining space as sheet expands
-                    .graphicsLayer { alpha = contentAlpha } // Fade out when collapsing
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = contentAlpha } // Fade out when collapsing
+                ) {
                 AnimatedContent(
+                    modifier = Modifier.fillMaxSize(),
                     targetState = selectedTab,
                     transitionSpec = {
                         if (targetState == "Chat") {
@@ -1682,30 +1883,47 @@ fun ThreeStateBottomSheet(
                             onBack = {
                                 onChatInitialMessageChanged(null)
                                 onTabSelected("Explore")
-                                coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                                coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
                             },
                             initialMessage = chatInitialMessage,
                             onFocus = {
                                 coroutineScope.launch {
                                     if (sheetHeightPx.value < expandedHeightPx * 0.8f) {
-                                        sheetHeightPx.animateTo(expandedHeightPx)
+                                        sheetHeightPx.animateTo(expandedHeightPx, androidx.compose.animation.core.tween(300))
                                     }
                                 }
                             }
                         )
-                        "Profile" -> ProfileView(
-                            isDarkTheme = isDarkTheme,
-                            selectedTheme = selectedTheme,
-                            onThemeSelected = onThemeSelected,
-                            isAutomatic = isAutomatic,
-                            onAutomaticToggle = onAutomaticToggle,
-                            onEditClick = { onTabSelected("ProfileEdit") },
-                            onLikedClick = { onTabSelected("Liked") },
-                            onSavedClick = { onTabSelected("Saved") },
-                            onReportClick = { onTabSelected("Report") },
-                            onHelpClick = { onTabSelected("Help") },
-                            onAboutClick = { onTabSelected("About") }
-                        )
+                        "Profile" -> {
+                            val localCtx = androidx.compose.ui.platform.LocalContext.current
+                            ProfileView(
+                                isDarkTheme = isDarkTheme,
+                                selectedTheme = selectedTheme,
+                                onThemeSelected = onThemeSelected,
+                                isAutomatic = isAutomatic,
+                                onAutomaticToggle = onAutomaticToggle,
+                                onEditClick = { onTabSelected("ProfileEdit") },
+                                onLikedClick = { onTabSelected("Liked") },
+                                onSavedClick = { onTabSelected("Saved") },
+                                onReportClick = { onTabSelected("Report") },
+                                onHelpClick = { onTabSelected("Help") },
+                                onAboutClick = { onTabSelected("About") },
+                                onBack = {
+                                    onTabSelected("Explore")
+                                    coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
+                                },
+                                // in profile view capule share button link URL
+                                onShare = {
+                                    val sendIntent = android.content.Intent().apply {
+                                        action = android.content.Intent.ACTION_SEND
+                                        putExtra(android.content.Intent.EXTRA_TEXT, "https://kochi.one")
+                                        type = "text/plain"
+                                    }
+                                    val shareIntent = android.content.Intent.createChooser(sendIntent, null)
+                                    androidx.core.content.ContextCompat.startActivity(localCtx, shareIntent, null)
+                                }
+                            )
+                        }
                         "Help" -> {
                             val localCtx = androidx.compose.ui.platform.LocalContext.current
                             HelpView(
@@ -1715,7 +1933,7 @@ fun ThreeStateBottomSheet(
                                 onShare = {
                                     val sendIntent = android.content.Intent().apply {
                                         action = android.content.Intent.ACTION_SEND
-                                        putExtra(android.content.Intent.EXTRA_TEXT, "Check out Kochi One, the ultimate city guide app!")
+                                        putExtra(android.content.Intent.EXTRA_TEXT, "https://kochi.one")
                                         type = "text/plain"
                                     }
                                     val shareIntent = android.content.Intent.createChooser(sendIntent, null)
@@ -1724,7 +1942,7 @@ fun ThreeStateBottomSheet(
                                 onAskLilly = { question ->
                                     onChatInitialMessageChanged(question)
                                     onTabSelected("Chat")
-                                    coroutineScope.launch { sheetHeightPx.animateTo(expandedHeightPx) }
+                                    coroutineScope.launch { sheetHeightPx.animateTo(expandedHeightPx, androidx.compose.animation.core.tween(300)) }
                                 }
                             )
                         }
@@ -1737,7 +1955,7 @@ fun ThreeStateBottomSheet(
                                 onShare = {
                                     val sendIntent = android.content.Intent().apply {
                                         action = android.content.Intent.ACTION_SEND
-                                        putExtra(android.content.Intent.EXTRA_TEXT, "Check out Kochi One, the ultimate city guide app!")
+                                        putExtra(android.content.Intent.EXTRA_TEXT, "https://kochi.one")
                                         type = "text/plain"
                                     }
                                     val shareIntent = android.content.Intent.createChooser(sendIntent, null)
@@ -1752,7 +1970,8 @@ fun ThreeStateBottomSheet(
                         "ProfileEdit" -> ProfileEditView(
                             isDarkTheme = isDarkTheme,
                             onBack = { onTabSelected("Profile") },
-                            onSave = { onTabSelected("Profile") }
+                            onSave = { onTabSelected("Profile") },
+                            onReport = { onTabSelected("Report") }
                         )
                         "Liked" -> LikedSavedItemsView(
                             isDarkTheme = isDarkTheme,
@@ -1769,8 +1988,29 @@ fun ThreeStateBottomSheet(
             }
             
             val isImeVisible = WindowInsets.isImeVisible
+            val isProfileTab = selectedTab == "Profile" || 
+                               selectedTab == "ProfileEdit" || 
+                               selectedTab == "Liked" || 
+                               selectedTab == "Saved" || 
+                               selectedTab == "Chat" || 
+                               selectedTab == "Report" || 
+                               selectedTab == "Help" || 
+                               selectedTab == "About"
             
-            if (!isImeVisible) {
+            val isPlayOrFitnessDetail = (selectedTab == "Play" || selectedTab == "Fitness") && playOrFitnessDetailOpen
+            
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !isImeVisible && !isProfileTab && !isPlayOrFitnessDetail,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = androidx.compose.animation.slideInHorizontally(
+                    initialOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = androidx.compose.animation.core.tween(300)
+                ),
+                exit = androidx.compose.animation.slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = androidx.compose.animation.core.tween(300)
+                )
+            ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1788,27 +2028,28 @@ fun ThreeStateBottomSheet(
                     ) {
                         NavItem(R.drawable.ic_explore, "Explore", selectedTab == "Explore", isDarkTheme, Modifier.weight(1f)) {
                             onTabSelected("Explore")
-                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
                         }
                         NavItem(R.drawable.ic_eat, "Eats", selectedTab == "Food", isDarkTheme, Modifier.weight(1f)) {
                             onTabSelected("Food")
-                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
                         }
                         NavItem(R.drawable.ic_play, "Play", selectedTab == "Play", isDarkTheme, Modifier.weight(1f)) {
                             onTabSelected("Play")
-                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
                         }
                         NavItem(R.drawable.ic_fitness, "Fitness", selectedTab == "Fitness", isDarkTheme, Modifier.weight(1f)) {
                             onTabSelected("Fitness")
-                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
                         }
                         NavItem(R.drawable.ic_transit, "Transit", selectedTab == "Transit", isDarkTheme, Modifier.weight(1f)) {
                             onTabSelected("Transit")
-                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx) }
+                            coroutineScope.launch { sheetHeightPx.animateTo(halfExpandedHeightPx, androidx.compose.animation.core.tween(300)) }
                         }
                     }
                 }
             }
+            } // Close the wrapper Box
         }
     }
 }

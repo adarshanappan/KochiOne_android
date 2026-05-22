@@ -21,10 +21,15 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imeNestedScroll
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -82,7 +87,8 @@ fun ChatView(
     val textColor = if (isDarkTheme) Color.White else Color.Black
     val secondaryText = textColor.copy(alpha = 0.6f)
     val inputBgColor = if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF0F0F0)
-    val userBubbleColor = Color(0xFF007AFF)
+    val userBubbleColor = textColor
+    val userBubbleTextColor = if (isDarkTheme) Color.Black else Color.White
     val aiBubbleColor = if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF0F0F0)
     val chipBgColor = if (isDarkTheme) Color(0xFF2C2C2C) else Color(0xFFF5F5F5)
     val chipBorderColor = if (isDarkTheme) Color.White.copy(alpha = 0.15f) else Color.Black.copy(alpha = 0.08f)
@@ -144,42 +150,6 @@ fun ChatView(
         "🌴 Hidden gems"
     )
 
-    fun getResponse(query: String): String {
-        val lower = query.lowercase()
-        return when {
-            lower.contains("restaurant") || lower.contains("food") || lower.contains("eat") ||
-            lower.contains("dinner") || lower.contains("dessert") || lower.contains("coffee") ||
-            lower.contains("café") || lower.contains("cafe") || lower.contains("bakery") ->
-                "Kochi is a foodie paradise! 🍽️ Check out the Eats tab for curated restaurant recommendations with ratings, menus, and directions."
-
-            lower.contains("metro") || lower.contains("train") || lower.contains("transit") ||
-            lower.contains("timing") ->
-                "🚇 The Kochi Metro runs daily from 6:00 AM to 10:00 PM with trains every 5–10 minutes. Head to the Transit tab for live train tracking!"
-
-            lower.contains("play") || lower.contains("cricket") || lower.contains("badminton") ||
-            lower.contains("sport") || lower.contains("game") ->
-                "Looking for some action? 🏏 The Play tab has the best sports venues — cricket grounds, badminton courts, and fun activity centers!"
-
-            lower.contains("gym") || lower.contains("fitness") || lower.contains("yoga") ||
-            lower.contains("workout") ->
-                "Stay fit in Kochi! 💪 The Fitness tab has gyms, yoga studios, and wellness centers near you."
-
-            lower.contains("thing") || lower.contains("explore") || lower.contains("visit") ||
-            lower.contains("hidden") || lower.contains("gem") ->
-                "Kochi has so much to explore! 🌴 From Fort Kochi and Chinese fishing nets to art galleries and backwaters. Check the Explore tab!"
-
-            lower.contains("your name") || lower.contains("who are you") || lower.contains("what's your name") ||
-            lower.contains("whats your name") || lower.contains("name?") ->
-                "I'm Lilly! 🌸 Your personal Kochi guide. I can help you find restaurants, activities, transit info, and hidden gems around the city!"
-
-            lower.contains("hello") || lower.contains("hi") || lower.contains("hey") ->
-                "Hey there! 👋 I'm your Kochi guide. Ask me about restaurants, transit, activities, or anything about the city!"
-
-            else ->
-                "Great question! 🤔 Explore the app tabs for restaurants, activities, fitness venues, and transit info. Try asking about food or metro!"
-        }
-    }
-
     fun sendMessage(text: String) {
         if (text.isBlank()) return
         messages.add(ChatMessage(text = text.trim(), isUser = true))
@@ -189,9 +159,9 @@ fun ChatView(
             if (messages.size > 0) {
                 listState.animateScrollToItem(messages.size - 1)
             }
-            delay(1000L + (500..1500).random().toLong())
+            val response = com.kochione.kochi_one.api.AiManager.requestChat(messages.toList())
             isTyping = false
-            messages.add(ChatMessage(text = getResponse(text), isUser = false))
+            messages.add(ChatMessage(text = response ?: "Sorry, something went wrong.", isUser = false))
             delay(100)
             listState.animateScrollToItem(messages.size - 1)
         }
@@ -205,7 +175,11 @@ fun ChatView(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .navigationBarsPadding()
+        .imePadding()
+    ) {
         // Header — morphs in from search bar
         Row(
             modifier = Modifier
@@ -270,10 +244,10 @@ fun ChatView(
                 }
         ) {
             if (messages.isEmpty()) {
-                // Welcome State
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
@@ -350,7 +324,7 @@ fun ChatView(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(messages) { message ->
-                        ChatBubble(message, userBubbleColor, aiBubbleColor, textColor)
+                        ChatBubble(message, userBubbleColor, aiBubbleColor, textColor, userBubbleTextColor)
                     }
                     if (isTyping) {
                         item {
@@ -413,7 +387,7 @@ fun ChatView(
                     .size(50.dp)
                     .clip(CircleShape)
                     .background(
-                        if (inputText.isNotBlank()) Color(0xFF007AFF) else inputBgColor
+                        if (inputText.isNotBlank()) textColor else inputBgColor
                     )
                     .clickable { sendMessage(inputText) },
                 contentAlignment = Alignment.Center
@@ -421,7 +395,7 @@ fun ChatView(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_near_me),
                     contentDescription = "Send",
-                    tint = if (inputText.isNotBlank()) Color.White else secondaryText,
+                    tint = if (inputText.isNotBlank()) userBubbleTextColor else secondaryText,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -434,11 +408,12 @@ private fun ChatBubble(
     message: ChatMessage,
     userBubbleColor: Color,
     aiBubbleColor: Color,
-    textColor: Color
+    textColor: Color,
+    userBubbleTextColor: Color = Color.White
 ) {
     val isUser = message.isUser
     val bubbleColor = if (isUser) userBubbleColor else aiBubbleColor
-    val bubbleTextColor = if (isUser) Color.White else textColor
+    val bubbleTextColor = if (isUser) userBubbleTextColor else textColor
     val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
     val shape = if (isUser) {
         RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp)
@@ -474,16 +449,20 @@ private fun ChatBubble(
     ) {
         Box(
             modifier = Modifier
-                .widthIn(max = 280.dp)
+                .widthIn(max = 320.dp)
                 .clip(shape)
                 .background(bubbleColor)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Text(
-                text = message.text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = bubbleTextColor
-            )
+            if (isUser) {
+                Text(
+                    text = message.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = bubbleTextColor
+                )
+            } else {
+                ChatArticleContentView(content = message.text, textColor = bubbleTextColor)
+            }
         }
     }
 }
@@ -535,6 +514,133 @@ private fun TypingIndicator(bgColor: Color, dotColor: Color) {
                         .clip(CircleShape)
                         .background(dotColor.copy(alpha = 0.5f))
                 )
+            }
+        }
+    }
+}
+
+data class ChatArticleBlock(val type: ChatArticleBlockType, val text: String)
+
+enum class ChatArticleBlockType {
+    HEADING, SECTION, SUBHEADING, PARAGRAPH, BULLET;
+
+    companion object {
+        fun fromMarker(marker: String): ChatArticleBlockType {
+            return when (marker) {
+                "1" -> HEADING
+                "2" -> SECTION
+                "3" -> SUBHEADING
+                "4" -> PARAGRAPH
+                "5" -> BULLET
+                else -> PARAGRAPH
+            }
+        }
+    }
+}
+
+fun parseContent(content: String): List<ChatArticleBlock> {
+    // Clean up potential typos from AI output
+    val text = content.replace("(1>", "(1)")
+        .replace("(2>", "(2)")
+        .replace("(3>", "(3)")
+        .replace("(4>", "(4)")
+        .replace("(5>", "(5)")
+        .replace(Regex("\\((\\d)\\)\\s*\\(\\1\\)"), "") // Remove empty tags
+
+    val pattern = "\\((\\d)\\)(.*?)\\(\\1\\)".toRegex(RegexOption.DOT_MATCHES_ALL)
+    val matches = pattern.findAll(text).toList()
+    
+    if (matches.isEmpty()) {
+        val cleanText = text.replace(Regex("\\(\\d\\)"), "")
+        return listOf(ChatArticleBlock(ChatArticleBlockType.PARAGRAPH, cleanText.trim()))
+    }
+    
+    val blocks = mutableListOf<ChatArticleBlock>()
+    var lastIndex = 0
+    for (match in matches) {
+        val preText = text.substring(lastIndex, match.range.first).trim()
+        if (preText.isNotEmpty()) {
+            val cleanPre = preText.replace(Regex("\\(\\d\\)"), "")
+            if (cleanPre.isNotBlank()) {
+                blocks.add(ChatArticleBlock(ChatArticleBlockType.PARAGRAPH, cleanPre))
+            }
+        }
+        val marker = match.groupValues[1]
+        val matchText = match.groupValues[2].trim()
+        if (matchText.isNotEmpty()) {
+            blocks.add(ChatArticleBlock(ChatArticleBlockType.fromMarker(marker), matchText))
+        }
+        lastIndex = match.range.last + 1
+    }
+    val postText = text.substring(lastIndex).trim()
+    if (postText.isNotEmpty()) {
+         val cleanPost = postText.replace(Regex("\\(\\d\\)"), "")
+         if (cleanPost.isNotBlank()) {
+             blocks.add(ChatArticleBlock(ChatArticleBlockType.PARAGRAPH, cleanPost))
+         }
+    }
+    
+    return blocks.ifEmpty { listOf(ChatArticleBlock(ChatArticleBlockType.PARAGRAPH, text.trim())) }
+}
+
+@Composable
+fun ChatArticleContentView(content: String, textColor: Color) {
+    val blocks = remember(content) { parseContent(content) }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        blocks.forEach { item ->
+            when (item.type) {
+                ChatArticleBlockType.HEADING -> {
+                    Text(
+                        text = item.text,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = textColor
+                    )
+                }
+                ChatArticleBlockType.SECTION -> {
+                    Text(
+                        text = item.text,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor
+                    )
+                }
+                ChatArticleBlockType.SUBHEADING -> {
+                    Text(
+                        text = item.text,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = textColor
+                    )
+                }
+                ChatArticleBlockType.PARAGRAPH -> {
+                    Text(
+                        text = item.text,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = textColor
+                    )
+                }
+                ChatArticleBlockType.BULLET -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = textColor
+                        )
+                        Text(
+                            text = item.text,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = textColor
+                        )
+                    }
+                }
             }
         }
     }

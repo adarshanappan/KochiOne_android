@@ -49,7 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import com.kochione.kochi_one.ui.components.ProgressiveImage
 import com.kochione.kochi_one.R
 import com.kochione.kochi_one.utils.LikedSavedStore
 import com.kochione.kochi_one.utils.SavedBucket
@@ -255,7 +255,7 @@ private fun SavedSheetCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                AsyncImage(
+                ProgressiveImage(
                     model = logo,
                     contentDescription = item.title,
                     modifier = Modifier.size(56.dp).clip(RoundedCornerShape(28.dp)).background(Color.DarkGray),
@@ -380,7 +380,7 @@ private fun SavedImageGrid(images: List<String>) {
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         top.forEachIndexed { index, url ->
-            AsyncImage(
+            ProgressiveImage(
                 model = url,
                 contentDescription = null,
                 modifier = Modifier
@@ -403,7 +403,7 @@ private fun SavedImageGrid(images: List<String>) {
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         bottom.forEachIndexed { index, url ->
-            AsyncImage(
+            ProgressiveImage(
                 model = url,
                 contentDescription = null,
                 modifier = Modifier
@@ -536,7 +536,7 @@ private fun OpenedSavedItemFullView(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    AsyncImage(
+                    ProgressiveImage(
                         model = logo,
                         contentDescription = item.title,
                         modifier = Modifier.size(72.dp).clip(RoundedCornerShape(36.dp)).background(Color.DarkGray),

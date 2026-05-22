@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,7 +46,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -98,16 +101,17 @@ private fun nowSeconds(): Int {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TransitView(isDark: Boolean, transitViewModel: TransitViewModel = viewModel()) {
-    val bgColor     = if (isDark) Color(0xFF1A1A1A) else Color.White
-    val cardBg      = if (isDark) Color(0xFF272727) else Color(0xFFF5F5F5)
-    val textColor   = if (isDark) Color.White else Color(0xFF1A1A1A)
+    val bgColor     = if (isDark) Color(0xFF1E1E1E) else Color.White
+    val cardBg      = if (isDark) Color(0xFF2C2C2C) else Color(0xFFF5F5F5)
+    val textColor   = if (isDark) Color.White else Color.Black
     val dimColor    = textColor.copy(alpha = 0.4f)
-    val highlightBg = if (isDark) Color(0xFF363636) else Color(0xFFE8E8E8)
+    val highlightBg = if (isDark) Color(0xFF3C3C3C) else Color(0xFFE8E8E8)
     val accentBlue  = Color(0xFF29B6F6)
     val accentPink  = Color(0xFFF06292)
 
     val haptic   = LocalHapticFeedback.current
     val stations = KmrlOpenData.stations
+    val coroutineScope = rememberCoroutineScope()
 
     val fromStation by transitViewModel.fromStation.collectAsState()
     val toStation by transitViewModel.toStation.collectAsState()
@@ -166,6 +170,15 @@ fun TransitView(isDark: Boolean, transitViewModel: TransitViewModel = viewModel(
             else            -> expandedTripId = null
         }
     }
+    
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(scrollState.isScrollInProgress) {
+        if (scrollState.isScrollInProgress) {
+            fromExpanded = false
+            toExpanded = false
+        }
+    }
 
     // verticalScroll lets the bottom-sheet's nestedScroll expand the sheet, then
     // scrolls the inner content once the sheet is fully open.
@@ -173,8 +186,8 @@ fun TransitView(isDark: Boolean, transitViewModel: TransitViewModel = viewModel(
         modifier = Modifier
             .fillMaxSize()
             .background(bgColor)
-            .verticalScroll(rememberScrollState())
-            .padding(top = 4.dp, bottom = 32.dp)
+            .verticalScroll(scrollState)
+            .padding(top = 4.dp, bottom = 140.dp)
     ) {
 
         // ── Header ────────────────────────────────────────────────────────
@@ -229,6 +242,13 @@ fun TransitView(isDark: Boolean, transitViewModel: TransitViewModel = viewModel(
             }
 
             // Swap button
+            var swapRotation by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+            val animatedSwapRotation by animateFloatAsState(
+                targetValue = swapRotation,
+                animationSpec = androidx.compose.animation.core.tween(300),
+                label = "swapRotation"
+            )
+
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -236,8 +256,13 @@ fun TransitView(isDark: Boolean, transitViewModel: TransitViewModel = viewModel(
                     .size(32.dp)
                     .clip(CircleShape)
                     .background(if (isDark) Color(0xFF404040) else Color(0xFFEAEAEA))
-                    .clickable {
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                    ) {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        swapRotation += 180f
+                        
                         val tmp = fromStation
                         transitViewModel.setFromStation(toStation)
                         transitViewModel.setToStation(tmp)
@@ -245,10 +270,12 @@ fun TransitView(isDark: Boolean, transitViewModel: TransitViewModel = viewModel(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    painter           = painterResource(id = R.drawable.ic_direction),
+                    painter           = painterResource(id = R.drawable.ic_swap_vert),
                     contentDescription = "Swap",
                     tint              = textColor,
-                    modifier          = Modifier.size(18.dp)
+                    modifier          = Modifier
+                                        .size(20.dp)
+                                        .graphicsLayer { rotationZ = animatedSwapRotation }
                 )
             }
         }
@@ -256,31 +283,45 @@ fun TransitView(isDark: Boolean, transitViewModel: TransitViewModel = viewModel(
         Spacer(modifier = Modifier.height(8.dp))
 
         // ── From picker ───────────────────────────────────────────────────
-        if (fromExpanded && stations.isNotEmpty()) {
-            StationWheelPicker(
-                stations    = stations,
-                initialSelected = fromStation,
-                cardBg      = cardBg,
-                textColor   = textColor,
-                dimColor    = dimColor,
-                highlightBg = highlightBg,
-                onSelect    = { transitViewModel.setFromStation(it) }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+        androidx.compose.animation.AnimatedVisibility(
+            visible = fromExpanded && stations.isNotEmpty(),
+            enter = androidx.compose.animation.expandVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)),
+            exit = androidx.compose.animation.shrinkVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(300))
+        ) {
+            Column {
+                StationWheelPicker(
+                    stations    = stations,
+                    initialSelected = fromStation,
+                    cardBg      = cardBg,
+                    textColor   = textColor,
+                    dimColor    = dimColor,
+                    highlightBg = highlightBg,
+                    onSelect    = { transitViewModel.setFromStation(it) },
+                    onFinalize  = { fromExpanded = false }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
 
         // ── To picker ─────────────────────────────────────────────────────
-        if (toExpanded && stations.isNotEmpty()) {
-            StationWheelPicker(
-                stations    = stations,
-                initialSelected = toStation,
-                cardBg      = cardBg,
-                textColor   = textColor,
-                dimColor    = dimColor,
-                highlightBg = highlightBg,
-                onSelect    = { transitViewModel.setToStation(it) }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+        androidx.compose.animation.AnimatedVisibility(
+            visible = toExpanded && stations.isNotEmpty(),
+            enter = androidx.compose.animation.expandVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)),
+            exit = androidx.compose.animation.shrinkVertically(animationSpec = androidx.compose.animation.core.tween(300)) + androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(300))
+        ) {
+            Column {
+                StationWheelPicker(
+                    stations    = stations,
+                    initialSelected = toStation,
+                    cardBg      = cardBg,
+                    textColor   = textColor,
+                    dimColor    = dimColor,
+                    highlightBg = highlightBg,
+                    onSelect    = { transitViewModel.setToStation(it) },
+                    onFinalize  = { toExpanded = false }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
 
         // ── Fare result ───────────────────────────────────────────────────
@@ -431,7 +472,8 @@ private fun StopRow(
 private fun StationWheelPicker(
     stations: List<MetroStation>, initialSelected: MetroStation?,
     cardBg: Color, textColor: Color, dimColor: Color, highlightBg: Color,
-    onSelect: (MetroStation) -> Unit
+    onSelect: (MetroStation) -> Unit,
+    onFinalize: () -> Unit = {}
 ) {
     val itemHeightDp  = 56.dp
     val visibleItems  = 5
@@ -442,6 +484,15 @@ private fun StationWheelPicker(
     val listState     = rememberLazyListState(initialFirstVisibleItemIndex = initialIdx)
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
     val coroutineScope = rememberCoroutineScope()
+
+    // Instantly snap to new value if it changes externally (e.g. from the Swap button) to prevent frame drops
+    LaunchedEffect(initialSelected) {
+        val targetIdx = stations.indexOfFirst { it.stopId == initialSelected?.stopId }.coerceAtLeast(0)
+        // Check if we aren't already near the target to prevent unnecessary scroll loops
+        if (kotlin.math.abs(listState.firstVisibleItemIndex - targetIdx) > 0) {
+            listState.scrollToItem(targetIdx)
+        }
+    }
 
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
@@ -525,24 +576,32 @@ private fun StationWheelPicker(
                 .nestedScroll(pickerNestedScrollConnection)
         ) {
             itemsIndexed(padded) { index, station ->
-                val dist     = abs(index - centerPaddedIdx)
-                val alpha    = when (dist) { 0 -> 1f; 1 -> 0.55f; else -> 0.25f }
-                val isCenter = dist == 0
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth().height(itemHeightDp)
+                        .fillMaxWidth()
+                        .height(itemHeightDp)
                         .then(if (station != null) Modifier.clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            coroutineScope.launch { listState.animateScrollToItem(index - padding) }
-                        } else Modifier),
+                            coroutineScope.launch { 
+                                listState.animateScrollToItem(index - padding) 
+                                onFinalize()
+                            }
+                        } else Modifier)
+                        .graphicsLayer {
+                            val dist = kotlin.math.abs(index - centerPaddedIdx)
+                            alpha = when (dist) { 0 -> 1f; 1 -> 0.55f; else -> 0.25f }
+                            val scale = if (dist == 0) 1.15f else 0.95f
+                            scaleX = scale
+                            scaleY = scale
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     when {
                         station != null -> Text(
                             text       = station.name,
-                            color      = textColor.copy(alpha = alpha),
-                            fontWeight = if (isCenter) FontWeight.Bold else FontWeight.Normal,
-                            fontSize   = if (isCenter) 19.sp else 15.sp,
+                            color      = textColor,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize   = 16.sp,
                             textAlign  = TextAlign.Center
                         )
                         index == 0 -> Text("Select one", color = dimColor, fontSize = 13.sp, textAlign = TextAlign.Center)
